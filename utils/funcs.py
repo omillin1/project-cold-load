@@ -2,12 +2,11 @@
 import numpy as np
 from netCDF4 import Dataset, num2date
 import os
-from datetime import datetime, timedelta
+from datetime import datetime
 from tqdm import tqdm
 from matplotlib import cm, colors
 import cartopy.feature as cfeature
 import cartopy.crs as ccrs
-import matplotlib.path as mpath
 import cftime
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -59,7 +58,7 @@ def format_daily_ERA5(var = 'hgt', level = 500, lat_bounds = [90, 0], lon_bounds
     year_bounds: list, length 2, integers representing the year bounds to use.
     months: list, strings of the month labels to use.
     ndays: integer, describes how many days there are in your month range.
-    lev_type: boolean, describes whether it is an isentropic level or not.
+    isentropic: boolean, describes whether it is an isentropic level or not.
 
     Outputs
     -------
@@ -112,10 +111,10 @@ def format_daily_ERA5(var = 'hgt', level = 500, lat_bounds = [90, 0], lon_bounds
                 reshape = data.reshape(int(len(time)/4), 4, data.shape[1], data.shape[2]) # Reshape to (days, hourly steps, lat, lon)
                 daily_ave = np.nanmean(reshape, axis = 1) # Daily average.
                 time_select = time[::4] # Get time stamp for every day but only once.
-                if daily_ave.shape[0] == 29:
+                if daily_ave.shape[0] == 29: # If the length of days is 29, remove Feb 29th.
                     daily_ave = daily_ave[:-1]
                     time_select = time_select[:-1]
-                else:
+                else: # Else continue.
                     daily_ave = daily_ave
                     time_select = time_select
                 season_list.append(daily_ave) # Append data to the data list.
@@ -172,10 +171,10 @@ def format_daily_ERA5(var = 'hgt', level = 500, lat_bounds = [90, 0], lon_bounds
                 reshape = data.reshape(int(len(time)/4), 4, data.shape[1], data.shape[2]) # Reshape to (days, hourly steps, lat, lon)
                 daily_ave = np.nanmean(reshape, axis = 1) # Daily average.
                 time_select = time[::4] # Get time stamp for every day but only once.
-                if daily_ave.shape[0] == 29:
+                if daily_ave.shape[0] == 29: # If the length of days is 29, remove Feb 29.
                     daily_ave = daily_ave[:-1]
                     time_select = time_select[:-1]
-                else:
+                else: # Else continue as normal.
                     daily_ave = daily_ave
                     time_select = time_select
                 season_list.append(daily_ave) # Append data to the data list.
@@ -185,10 +184,6 @@ def format_daily_ERA5(var = 'hgt', level = 500, lat_bounds = [90, 0], lon_bounds
             # Vertically stack the season_list and convert dates to an array and assign to the arrays.
             era_var[y] = np.vstack(season_list)
             era_time[y] = np.asarray(dates_list)
-    # Format the hours.
-    #for i in range(era_time.shape[0]):
-        #for j in range(era_time.shape[1]):
-            #era_time[i, j] = era_time[i, j].replace(hour = 0)
 
 
     return era_var, era_time, latitude, longitude
@@ -262,10 +257,10 @@ def minmax_2d_ERA5(var = 'Tmin', lat_bounds = [90, 0], lon_bounds = [0, 359.5], 
             data = era.variables[var_ind][:,lat_index_1:lat_index_2+1,lon_index_1:lon_index_2+1] # Read in the restricted data.
             time = num2date(era.variables['time'][:],era.variables['time'].units,era.variables['time'].calendar, only_use_cftime_datetimes=False, only_use_python_datetimes=True) # Read in datetimes.
             era.close() # Close the file.
-            if data.shape[0] == 29:
+            if data.shape[0] == 29: # If the length of days is 29, remove Feb 29.
                 data = data[:-1]
                 time = time[:-1]
-            else:
+            else: # Else, continue as normal.
                 data = data
                 time = time
             season_list.append(data) # Append data to the data list.
@@ -333,42 +328,28 @@ def DrawPolygon(ax, lat_bounds = [-8, -40], lon_bounds = [295, 325], res = 0.5, 
     
     return plot1, plot2, plot3, plot4
 
-# Define a SP Stereographic Map.
-def SP_StereMap(fig, subplot = [1, 1, 1], lon_bounds = [0, 360], lat_bounds = [20, -90]):
-    # Circle trajectories.
-    theta = np.linspace(0, 2*np.pi, 100)
-    center, radius = [0.5, 0.5], 0.5
-    verts = np.vstack([np.sin(theta), np.cos(theta)]).T
-    circle = mpath.Path(verts * radius + center)
-    ax1 = fig.add_subplot(subplot[0], subplot[1], subplot[2], projection = ccrs.SouthPolarStereo(central_longitude=-80))
-    ax1.set_extent([lon_bounds[0], lon_bounds[1], lat_bounds[0], lat_bounds[1]], crs=ccrs.PlateCarree())
-    ax1.coastlines()
-    ax1.add_feature(cfeature.BORDERS)
-    ax1.set_boundary(circle, transform=ax1.transAxes)
-    return ax1
-
-# Define a NP Stereographic Map.
-def NP_StereMap(fig, subplot = [1, 1, 1], lon_bounds = [0, 360], lat_bounds = [90, 20], cen_lon = -100):
-    # Circle trajectories.
-    theta = np.linspace(0, 2*np.pi, 100)
-    center, radius = [0.5, 0.5], 0.5
-    verts = np.vstack([np.sin(theta), np.cos(theta)]).T
-    circle = mpath.Path(verts * radius + center)
-    ax1 = fig.add_subplot(subplot[0], subplot[1], subplot[2], projection = ccrs.NorthPolarStereo(central_longitude=cen_lon))
-    ax1.set_extent([lon_bounds[0], lon_bounds[1], lat_bounds[0], lat_bounds[1]], crs=ccrs.PlateCarree())
-    ax1.coastlines()
-    ax1.add_feature(cfeature.BORDERS)
-    ax1.set_boundary(circle, transform=ax1.transAxes)
-    return ax1
-
 
 # Define a Plate Carree Map.
 def PlateCarreeMap(fig, subplot = [1, 1, 1], lon_bounds = [260, 330], lat_bounds = [20, -60], cen_lon = 295):
-    ax1 = fig.add_subplot(subplot[0], subplot[1], subplot[2], projection=ccrs.PlateCarree(central_longitude = cen_lon))
-    ax1.set_extent([lon_bounds[0], lon_bounds[1], lat_bounds[0], lat_bounds[1]], crs=ccrs.PlateCarree())
-    ax1.set_extent([lon_bounds[0], lon_bounds[1], lat_bounds[0], lat_bounds[1]], crs=ccrs.PlateCarree())
-    ax1.coastlines()
-    ax1.add_feature(cfeature.BORDERS)
+    '''
+    Function to plot a cartopy PlateCarree map.
+
+    Parameters
+    -------
+    fig: matplotlib.pyplot figure object, the figure to plot the map at a subplot position.
+    subplot: list of length 3, representing the rows, columns, and position of the figure subplot.
+    lon_bounds: list of length 2, the longitude bounds for the plot in degrees east with the furthest west longitude in the first position.
+    lat_bounds: list of length 2, the latitude bounds for the plot in degrees north with the furthest north latitude in the first position.
+    cen_lon: float or integer, the central longitude coordinate of the map plot.
+
+    Outputs
+    -------
+    ax1: matplotlib.pyplot.add_subplot feature, the object containing the map to subplot.
+    '''
+    ax1 = fig.add_subplot(subplot[0], subplot[1], subplot[2], projection=ccrs.PlateCarree(central_longitude = cen_lon)) # Generate the figure at the given subplot position.
+    ax1.set_extent([lon_bounds[0], lon_bounds[1], lat_bounds[0], lat_bounds[1]], crs=ccrs.PlateCarree()) # Set the extent of the map.
+    ax1.coastlines() # Draw coastlines.
+    ax1.add_feature(cfeature.BORDERS) # Add borders.
     return ax1
 
 # Define the linear detrend function.
@@ -377,57 +358,53 @@ def LinearDetrend(y):
 
     Parameters
     ---------
-    y: The array to be detrended.
+    y: 1-D NumPy array containing the data to be detrended.
 
     Returns
     ---------
-    detrendedData: The detrended data.
-    longitude: The slope of the trend line.
+    detrendedData: 1-D NumPy array containing the detrended data.
+    trend: float, the slope of the trend line.
     """
-    time = np.arange(y.shape[0])
+    time = np.arange(y.shape[0]) # Get an array of points of shape time.
 
-    E = np.ones((y.shape[0],2))
-    E[:,0] = time
+    E = np.ones((y.shape[0],2)) # Create E matrix.
+    E[:,0] = time # Fill the first column with the time indices.
 
-    invETE = np.linalg.inv(np.dot(E.T,E))
-    xhat = invETE.dot(E.T).dot(y)
-    trend = np.dot(E,xhat)
-    detrendedData = y - trend
+    invETE = np.linalg.inv(np.dot(E.T,E)) # Do the matrix multiplication E.T by E.
+    xhat = invETE.dot(E.T).dot(y) # Get the xhat.
+    trend = np.dot(E,xhat) # Matrix multiplication for the trend.
+    detrendedData = y - trend # Remove trend for the detrended data.
     return detrendedData,trend
 
-def LinearRegression(x_data, y_data):
-    # Set up the matrix E.
-    E = np.zeros((y_data.size, 2))
-    # We know y is the peak load.
-    y = y_data.copy()
-    # We know y = Ex + n. x contains the regression coefficient.
-    # Set first column of E to be the temperature, and second column as ones.
-    E[:, 0] = x_data
-    E[:, 1] = 1
-
-    # Now calculate xhat to get slope and y-intercept.
-
-    inv_term = np.linalg.inv(np.dot(E.T, E))
-    xhat = np.dot(np.dot(inv_term, E.T), y)
-
-    # For equation y=ax+b:
-    a = xhat[0]
-    b = xhat[1]
-
-    # Now createa straight line covering all the data you just had.
-    min_data = np.nanmin(x_data)
-    max_data = np.nanmax(x_data)
-
-    x_graph = np.arange(min_data, max_data+0.1, 0.1)
-    y_line = (a*x_graph)+b
-
-    return x_graph, y_line
-
 def is_months(month, month_bnd = [3, 11]):
-        return (month <= month_bnd[0]) | (month >= month_bnd[1])
+    """Returns boolean indices of months selected
+        
+    Parameters
+    ---------
+    month: 1-D NumPy array, representing the month in a time array
+    month_bnd: list of length 2, representing the early and late month bounds
+        
+    Returns
+    ---------
+    (month <= month_bnd[0]) | (month >= month_bnd[1]): 1-D NumPy array, representing the booleans for whether the month condition is met
+    """
+    return (month <= month_bnd[0]) | (month >= month_bnd[1])
 
 
 def read_early_load(div = 'OKGE', year1 = 1999, month_bnd = [3, 11]):
+    """Retrieves hourly SPP load for a given division for the dataset from 1999-2010.
+        
+    Parameters
+    ---------
+    div: string, the division name.
+    year1: integer, the first year bound of the data to retrieve.
+    month_bnd: list of length 2, contains the month bounds for retrieval with the earliest month in the first position.
+        
+    Returns
+    ---------
+    dates_final: 1D NumPy array of datetimes, the times associated with the load values.
+    load_final: 1D NumPy array, the load values for the given SPP division.
+    """
     # Go to directory.
     dir = '/share/data1/Students/ollie/CAOs/Data/Energy/Load/SPP/Divisional/1999_2010'
     path = os.chdir(dir)
@@ -459,15 +436,16 @@ def read_early_load(div = 'OKGE', year1 = 1999, month_bnd = [3, 11]):
     load_period = load_region[ind_month] # This is now load for DJF between 1999-2010.
 
     # Now get datetimes for this period.
-    dates_list = []
-    for i in range(len(load_period)):
+    dates_list = [] # Empty list for the dates.
+    for i in range(len(load_period)): # Loop through each day and append the datetime to the empty list.
         dates_list.append(datetime(year_period[i], month_period[i], day_period[i], hour_period[i]))
     dates_arr = np.asarray(dates_list) # Make to an array.
 
     # Now restrict to start year you want.
-    year_track = np.array([d.year for d in dates_arr])
-    year_ind = np.where(year_track >= year1)[0]
+    year_track = np.array([d.year for d in dates_arr]) # Get year tracker.
+    year_ind = np.where(year_track >= year1)[0] # Find the indices for where the dates are larger than the given year.
 
+    # Now restrict the dates and load to the years you want.
     dates_restr, load_restr = dates_arr[year_ind], load_period[year_ind]
 
     # Turn into xarray dataset.
@@ -502,6 +480,21 @@ def read_early_load(div = 'OKGE', year1 = 1999, month_bnd = [3, 11]):
 
 
 def read_late_load(year1, year2, months=['01', '02', '03', '04', '10', '11', '12'], month_bnd = [3, 11], div = 'OKGE'):
+    """Retrieves hourly SPP load for 2011-2023.
+        
+    Parameters
+    ---------
+    year1: integer, the first year bound of the data to retrieve.
+    year2: integer, the second year bound of the data to retrieve.
+    months: list of strings, containing each month indentifier to retrieve. If you want NDJFM, select ONDJFMA with month_bound = [3, 11].
+    month_bnd: list of length 2, contains the month bounds for retrieval with the earliest month in the first position.
+    div: string, the division name.
+        
+    Returns
+    ---------
+    final_dates: 1D NumPy array of datetimes, the times associated with the load values.
+    final_load: 1D NumPy array, the load values for the given SPP division.
+    """
     # Go to directory.
     dir = '/share/data1/Students/ollie/CAOs/Data/Energy/Load/SPP/Divisional'
     path = os.chdir(dir)
@@ -514,8 +507,8 @@ def read_late_load(year1, year2, months=['01', '02', '03', '04', '10', '11', '12
     load_list = []
 
     # Loop through years and months.
-    for i in tqdm(range(len(year_select))):
-        for j in range(len(month_select)):
+    for i in tqdm(range(len(year_select))): # Through selected years.
+        for j in range(len(month_select)): # Through selected months.
             # Get filename.
             filename =f"{year_select[i]}/HOURLY_LOAD-{year_select[i]}{month_select[j]}.csv"
             # Open the file.
@@ -535,18 +528,18 @@ def read_late_load(year1, year2, months=['01', '02', '03', '04', '10', '11', '12
                 date_lst = []
                 for k in range(len(dates)): # Loop through dates.
                     if len(dates[k]) <= 10: # Get dates.
-                        date_lst.append(datetime.strptime(dates[k]+' 0:00', "%m/%d/%Y %H:%M"))
+                        date_lst.append(datetime.strptime(dates[k]+' 0:00', "%m/%d/%Y %H:%M")) # If length of str date is less than 10, it is midnight so add 0:00.
                     else:
-                        date_lst.append(datetime.strptime(dates[k], "%m/%d/%Y %H:%M"))
+                        date_lst.append(datetime.strptime(dates[k], "%m/%d/%Y %H:%M")) # Else continues as normal for this condition.
             # If it is 2015 or 2016, slightly different format for date.
             elif (year_select[i] > 2014)&(year_select[i] < 2017):
                 # Get dates.
                 date_lst = []
                 for k in range(len(dates)): # Loop through dates.
                     if len(dates[k]) <= 10:
-                        date_lst.append(datetime.strptime(dates[k]+' 0:00', "%m/%d/%Y %H:%M"))
+                        date_lst.append(datetime.strptime(dates[k]+' 0:00', "%m/%d/%Y %H:%M")) # If length of str date is less than 10, it is midnight so add 0:00.
                     else:
-                        date_lst.append(datetime.strptime(dates[k], "%m/%d/%Y %H:%M"))
+                        date_lst.append(datetime.strptime(dates[k], "%m/%d/%Y %H:%M")) # Else continues as normal for this condition.
             # If year is greater than 2017, different format date.
             elif (year_select[i] >= 2017):
                 # Get dates.
@@ -559,12 +552,12 @@ def read_late_load(year1, year2, months=['01', '02', '03', '04', '10', '11', '12
                 for k in range(len(dates)): # Loop through dates.
                     date_lst.append(datetime.strptime(dates[k], "%m/%d/%y %H:%M"))
 
-            date_arr = np.array(date_lst) # Make dates into an array.
+            date_arr = np.array(date_lst) # Make dates into an array (will be all hours for the selected year and month).
 
             date_list.append(date_arr) # Append array of dates for division to main list.
             load_list.append(load) # Append array of loads for division to main list.
     
-    # Now stack the arrays.
+    # Now concatenate the separate arrays in the list to get continuous data.
     load_array = np.concatenate((load_list))
     date_array = np.concatenate((date_list))
 
@@ -576,13 +569,14 @@ def read_late_load(year1, year2, months=['01', '02', '03', '04', '10', '11', '12
         coords=dict(
             time=date_array
         ),
-        attrs=dict(description=f"Load (MW) for {div}"),
+        attrs=dict(description=f"Load (MWh) for {div}"),
     )
-
+    # Now retrieve only data for months that you want to keep.
     grouped_ds = ds.sel(time=is_months(ds['time.month'], month_bnd=month_bnd))
 
     # Sort by time.
     sorted_ds = grouped_ds.sortby('time')
+
     # Remove leap days.
     leap_remove = sorted_ds.convert_calendar('noleap')
 
@@ -608,145 +602,37 @@ def read_late_load(year1, year2, months=['01', '02', '03', '04', '10', '11', '12
     incomplete_dt = np.array([datetime(2018, 3, 6), datetime(2018, 12, 12), datetime(2021, 11, 10),\
                                datetime(2022, 11, 3), datetime(2022, 12, 12), datetime(2022, 12, 20), datetime(2023, 3, 12)])
 
+    years_arr = np.array([d.year for d in dt_dates]) # Get the year array of dt_dates.
+    months_arr = np.array([d.month for d in dt_dates]) # Get the month array of dt_dates.
+    days_arr = np.array([d.day for d in dt_dates]) # Get the day array of dt_dates.
+
     # Now let's loop through and get indices to remove.
     ind_list = [] # Empty list to append to.
     for i in range(len(incomplete_dt)):
-        years_arr = np.array([d.year for d in dt_dates])
-        months_arr = np.array([d.month for d in dt_dates])
-        days_arr = np.array([d.day for d in dt_dates])
-
-        ind = np.where((years_arr == incomplete_dt[i].year)&(months_arr == incomplete_dt[i].month)&(days_arr == incomplete_dt[i].day))[0]
-
-        ind_list.append(ind)
-
+        ind = np.where((years_arr == incomplete_dt[i].year)&(months_arr == incomplete_dt[i].month)&(days_arr == incomplete_dt[i].day))[0] # Finds all indices for given incomplete days.
+        ind_list.append(ind) # Appends missing data day indices.
+    # Concatenate the index lists.
     conc_inds = np.concatenate((ind_list))
-
+    # Delete the indices from the load and date arrays.
     final_load, final_dates = np.delete(adj_load, conc_inds), np.delete(dt_dates, conc_inds)  
 
     return final_dates, final_load
 
-def read_ercot(year1, year2):
-    # Go to directory.
-    dir = '/share/data1/Students/ollie/CAOs/Data/Energy/Load/ERCOT/'
-    path = os.chdir(dir)
-    # Select parameters.
-    year_select = np.arange(year1, year2+1, 1)
-    # Empty lists to store load data.
-    date_list = []
-    load_list = []
-
-    for i in tqdm(range(len(year_select))):
-        if (year_select[i] > 2014)&(year_select[i] < 2017):
-            # Get filename.
-            filename =f"{year_select[i]}/Native_Load_{year_select[i]}.csv"
-            # Open the file.
-            energy_frame = pd.read_csv(filename, skipinitialspace=True)
-            energy_frame.dropna(how="all", inplace=True)
-            # Read in times and load values.
-            dates = energy_frame['Hour_End'].values
-            load = energy_frame['ERCOT'].values
-
-            date_init = []
-            for k in range(len(dates)): # Loop through dates.
-                date_init.append(datetime.strptime(dates[k], "%d/%m/%Y %H:%M"))
-        
-            date_arr = np.array(date_init) # Make dates into an array.
-
-            date_list.append(date_arr)
-            load_list.append(load)
-    
-        elif (year_select[i] >= 2017):
-            # Get filename.
-            filename =f"{year_select[i]}/Native_Load_{year_select[i]}.csv"
-            # Open the file.
-            energy_frame = pd.read_csv(filename, skipinitialspace=True, thousands=r',')
-            energy_frame.dropna(how="all", inplace=True)
-            # Read in times and load values.
-            if (year_select[i] > 2017)&(year_select[i] < 2021):
-                dates = energy_frame['HourEnding'].values
-            else:
-                dates = energy_frame['Hour Ending'].values
-            load = energy_frame['ERCOT'].values
-
-            date_init = []
-            for k in range(len(dates)): # Loop through dates.
-                if dates[k][11:] == '24:00':
-                    month_part = dates[k][0:2]
-                    day_part = dates[k][3:5]
-                    new_str_prev = f"{month_part}/{day_part}/{year_select[i]} 23:00"
-                    date_init.append(datetime.strptime(new_str_prev, "%m/%d/%Y %H:%M")+timedelta(hours = 1))
-                elif ('DST' in dates[k]):
-                    date_init.append(datetime.strptime(dates[k][:-4], "%m/%d/%Y %H:%M"))
-                else:
-                    date_init.append(datetime.strptime(dates[k], "%m/%d/%Y %H:%M"))
-        
-            date_arr = np.array(date_init) # Make dates into an array.
-
-            date_list.append(date_arr)
-            load_list.append(load)
-        else:
-            # Get filename.
-            filename =f"{year_select[i]}/{year_select[i]}_ercot_hourly_load_data.csv"
-            # Open the file.
-            energy_frame = pd.read_csv(filename, skipinitialspace=True)
-            energy_frame.dropna(how="all", inplace=True)
-            # Read in times and load values.
-            dates = energy_frame['Hour_End'].values
-            load = energy_frame['ERCOT'].values
-
-            date_init = []
-            for k in range(len(dates)): # Loop through dates.
-                date_init.append(datetime.strptime(dates[k], "%d/%m/%Y %H:%M"))
-        
-            date_arr = np.array(date_init) # Make dates into an array.
-
-            date_list.append(date_arr)
-            load_list.append(load)
-
-    # Now stack the arrays.
-    load_array = np.concatenate((load_list))
-    date_array = np.concatenate((date_list))
-
-    # Turn into xarray dataset.
-    ds = xr.Dataset(
-        data_vars=dict(
-            load=(["time"], load_array),
-        ),
-        coords=dict(
-            time=date_array
-        ),
-        attrs=dict(description=f"Load (MW) for ERCOT"),
-    )
-
-    # Group by December-February.
-    grouped_ds = ds.sel(ds['time.season']=='DJF')
-
-    # Sort by time.
-    sorted_ds = grouped_ds.sortby('time')
-
-    # Remove leap days.
-    leap_remove = sorted_ds.convert_calendar('noleap')
-
-    # Get the data and dates out of the dataset.
-    load_data = leap_remove['load'].values
-    load_dates = leap_remove['time'].values
-
-    # Find where it is not the first or last day of the dataset.
-    ind1 = np.where((load_dates >= cftime.DatetimeNoLeap(year1, 1, 2))&(load_dates < cftime.DatetimeNoLeap(year2+1, 1, 1)))[0]
-    # Restrict the data.
-    final_load = load_data[ind1]
-    adj_dates = load_dates[ind1]
-
-    # Convert to python datetimes.
-    final_date_lst = [] # List to append dates.
-    for i in range(len(adj_dates)):
-        final_date_lst.append(datetime(adj_dates[i].year, adj_dates[i].month, adj_dates[i].day, adj_dates[i].hour, adj_dates[i].minute)) # Append the dates.
-    # Make dates into array.
-    final_dates = np.array(final_date_lst)
-
-    return final_load, final_dates
 
 def subcategorybar(X, vals, errors, error_col, width=0.8, bt = 1, capsize = 10, colors = ['darkblue', 'gray', 'darkred']):
+    """Plots a subcategory bar.
+        
+    Parameters
+    ---------
+    X: 1-D NumPy array of integers, shape should resemble that of the number of x-axis ticks.
+    vals: list of arrays, the size of the list should resemble the number of bars and the shape of the arrays should resemble the shape of X.
+    errors: list of arrays, the size of the list should resemble the number of bars and the shape of the arrays should be 2 (absolute value of min and max error bar for each category).
+    error_col: string, the color for error bars.
+    width: float, bar widths.
+    bt: float or integer, the reference value of the plot.
+    capsize: float or integer, the size of the errorbar caps.
+    colors: list of strings, should be the size of the number of bars (size of vals).
+    """
     n = len(vals)
     colors = colors
     _X = np.arange(len(X))
@@ -755,31 +641,49 @@ def subcategorybar(X, vals, errors, error_col, width=0.8, bt = 1, capsize = 10, 
                 width=width/float(n), align="edge", color = colors[i], edgecolor = 'black', yerr = errors[i], ecolor = error_col, capsize = capsize)   
     plt.xticks(_X, X)
 
-# Define function to take consecutive array indices meeting a certain criteria.
-def consec(arr, stepsize=1):
-    """Splits an array where it meets a condition consecutively.
-
+def plot_fit(X, Y):
+    """Fits a second degree polynomial between two datasets.
+        
     Parameters
     ---------
-    arr: numpy array 1d.
-    stepsize: how many steps to split by.
-
+    X: 1-D NumPy array, the X data to fit the model to.
+    Y: 1-D NumPy array, the Y data to fit the model to.
+        
     Returns
     ---------
-    List of split arrays of indices in original array that meet certain criteria consecutively.
+    X_fit: 1-D NumPy array, the X values to use to predict the Y value.
+    Y_fit: 1-D NumPy array, the Y values that are predicted for the model based on X.
+    a: float, the quadratic coefficient in ax^2+bx+c.
+    b: float, the linear coefficient in ax^2+bx+c.
+    c: float, the y-intercept coefficient in ax^2+bx+c.
+    fit_equation: function object, the fit object used to hold the model.
     """
-    return np.split(arr, np.where(np.diff(arr) != stepsize)[0]+1)
-
-def plot_fit(X, Y, minX, maxX, deg = 2):
+    # Use polyfit to fit a 2nd degree polynomial to the data.
     a, b, c = np.polyfit(X, Y, 2)
+    # Fit the model to the data.
     fit_equation = lambda x: (a*x**2) + (b*x) + c
-    
-    X_fit = np.linspace(minX, maxX, 1000)
+    # Generate an array of X values for the model prediction.
+    X_fit = np.linspace(np.nanmin(X), np.nanmax(X), 1000)
+    # Predict the Y values based off the selected X values.
     Y_fit = fit_equation(X_fit)
 
     return X_fit, Y_fit, a, b, c, fit_equation
 
 def read_cust_data(div = 'OKGE', year1 = 1999, year2 = 2022, param = 'Customers'):
+    """Reads SPP customer data by division.
+        
+    Parameters
+    ---------
+    div: string, the balancing authority to use.
+    year1: integer, the first year bound to use.
+    year2: integer, the second year bound to use.
+    param: the parameter to read, in this case Customers.
+        
+    Returns
+    ---------
+    year_restr: 1-D NumPy array, contains array of years for data.
+    data_restr: 1-D NumPy array of shape year_restr, data for each year.
+    """
     # Go to directory.
     dir = '/share/data1/Students/ollie/CAOs/Data/Energy/NCustomers/SPP/Divisional/'
     path = os.chdir(dir)
@@ -814,3 +718,60 @@ def read_cust_data(div = 'OKGE', year1 = 1999, year2 = 2022, param = 'Customers'
     year_restr, data_restr = year_region[year_ind], data_region[year_ind]
 
     return year_restr, data_restr
+
+def rsquared(ytrue, ypred):
+    """Calculates the coefficient of determination (R2) for a given model and obs.
+        
+    Parameters
+    ---------
+    ytrue: 1-D NumPy array, contains the true data.
+    ypred: 1-D NumPy array, contains the predicted data from the model.
+        
+    Returns
+    ---------
+    R2: float, the coefficient of determination.
+    """
+    # SST (Sum of Squares Total) calculation.
+    mean_ytrue = np.nanmean(ytrue) # Get mean of true values.
+    sst = np.sum((ytrue - mean_ytrue)**2) # SST
+
+    # SSE (Sum of Squares Error) calculation.
+    sse = np.nansum((ytrue - ypred)**2)
+
+    # Coefficient of determination calculation.
+    R2 = 1-(sse/sst)
+
+    return R2
+
+def read_regimes(fname):
+    """Reads in regimes and associated dates from the txt file.
+        
+    Parameters
+    ---------
+    fname: string, the filename of the regime file.
+        
+    Returns
+    ---------
+    regimes: 1-D NumPy array, contains strings with the regimes.
+    dates_regime: 1-D NumPy array, contains datetimes of the dates for the regimes.
+    """
+    # Get filename of regimes file.
+    filename = fname
+    # Set headers for txt file.
+    headers = ['Day', 'Regime']
+
+    # Read in data for txt file of regimes.
+    data = pd.read_csv(filename, delim_whitespace=True, skiprows = [0], names=headers, index_col=False)
+
+    # Get regimes and corresponding days.
+    days = data['Day'].values
+    regimes = data['Regime'].values
+
+    # Turn dates into datetimes.
+    dates_regime_list = [] # Empty list to store datetime objects.
+    for i in range(len(days)): # Loop through days (string format).
+        dates_regime_list.append(datetime.strptime(days[i], '%Y-%m-%d')) # Append associated datetime.
+    # Convert list of dates to a python array.
+    dates_regime = np.array(dates_regime_list)
+
+    return regimes, dates_regime

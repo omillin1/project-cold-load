@@ -1,27 +1,19 @@
 ###### Import modules ######
-from calendar import month
-from sklearn.neighbors import KernelDensity
-from sklearn.model_selection import GridSearchCV
 import sys
 sys.path.insert(2, '/share/data1/Students/ollie/CAOs/project-cold-load')
 import numpy as np
-import pandas as pd
-from datetime import datetime, timedelta
 import os
-from glob import glob
 from tqdm import tqdm
 import matplotlib.pyplot as plt
-from scipy.stats import pearsonr
-import scipy.stats
-import cartopy.crs as ccrs
-import cartopy.feature as cf
 from utils import funcs
 
-###### Set up regions to retrieve and years to use ######
+###### Set up balancing authorities to retrieve and years to use ######
+
 divs = ['KACY', 'WR', 'SPS', 'OKGE', 'CSWS', 'SECI', 'WFEC', 'EDE', 'NPPD', 'OPPD', 'KCPL', 'MPS']
 year1, year2 = 1999, 2022
 
 ###### Get dates for time period ######
+
 dates_arr = funcs.read_early_load(div = 'OKGE', year1 = year1, month_bnd = [3, 11])[0] # 1999-2010 dates.
 dates_arr2 = funcs.read_late_load(2011, year2, months=['01', '02', '03', '04', '10', '11', '12'], month_bnd = [3, 11], div = 'OKGE')[0] # 2011-2022 dates.
 # Join the dates.
@@ -29,6 +21,7 @@ all_dates = np.concatenate((dates_arr, dates_arr2))
 
 
 ###### Loop through the regions and get the data ######
+
 data_region = [] # List to append the data for each region.
 for i in tqdm(range(len(divs))): # Loop through divisions
     load_early = funcs.read_early_load(div = divs[i], year1 = 1999, month_bnd = [3, 11])[1] # Get the 1999-2010 hourly load.
@@ -40,6 +33,7 @@ for i in tqdm(range(len(divs))): # Loop through divisions
 all_regions = np.stack(data_region)
 
 ###### Now for peak load ######
+
 # Reshape the load and dates into shape (div, days, 24 hours) and (days, 24 hours)
 load_reshape = all_regions.reshape(len(divs), int(all_regions.shape[1]/24), 24)
 date_reshape = all_dates.reshape(int(all_dates.shape[0]/24), 24)
@@ -52,6 +46,7 @@ peak_load = np.nanmax(sum_load, axis = 1)
 date_load = date_reshape[:, 0] # This is to get a date for each day on the record (midnight selected).
 
 ###### Scale by number of customers ######
+
 # Get a years, months, and days tracker.
 years_all = np.array([d.year for d in date_load])
 months_all = np.array([d.month for d in date_load])
@@ -66,10 +61,10 @@ for i in tqdm(range(len(divs))): # Loop through divisions.
 
     cust_region.append(data_cust) # Append customer number by year to the empty list.
 
-# Now vstack to get shape (regions, year).
+# Now stack to get shape (regions, year).
 all_cust = np.stack(cust_region)/1000 # For thousands of customers.
 
-# Sum for all customers by region. Will give shape (year,)
+# Sum customers across region. Will give shape (year,)
 sum_cust = np.nansum(all_cust, axis = 0)
 
 # Now go through and scale the peak load by number of customers.
@@ -103,7 +98,7 @@ lat_ave_tmin = np.average(era5_tmin, weights = weights, axis = 2) # Latitude wei
 area_ave_t2m = np.nanmean(lat_ave_t2m, axis = -1) # Daily average T2M.
 area_ave_tmin = np.nanmean(lat_ave_tmin, axis = -1) # Daily min T2M.
 
-# Reshape T2M ddaily average data to (days,).
+# Reshape T2M daily average data to (days,).
 t2m_reshape = area_ave_t2m.reshape(area_ave_t2m.shape[0]*area_ave_t2m.shape[1])-273.15 # For degrees C.
 t2m_time_reshape = era5_time.reshape(era5_time.shape[0]*era5_time.shape[1])
 # Reshape T2M min data to (days,).
@@ -119,27 +114,14 @@ for i in range(len(anom_peak_load)): # Loop through the shape of peak load dates
 
 
 ###### Polynomial Function ######
-X_fit, Y_fit, a, b, c, eqn_t2m = funcs.plot_fit(t2m_peak_load, anom_peak_load, np.nanmin(t2m_peak_load), np.nanmax(t2m_peak_load), 2) # Fit a polynomial function for peak load-daily average T2M.
-X_fit_tmin, Y_fit_tmin, amin, bmin, cmin, eqn_tmin = funcs.plot_fit(tmin_peak_load, anom_peak_load, np.nanmin(tmin_peak_load), np.nanmax(tmin_peak_load), 2) # Fit a polynomial function for peak load-daily min T2M.
+X_fit, Y_fit, a, b, c, eqn_t2m = funcs.plot_fit(t2m_peak_load, anom_peak_load) # Fit a polynomial function for peak load-daily average T2M.
+X_fit_tmin, Y_fit_tmin, amin, bmin, cmin, eqn_tmin = funcs.plot_fit(tmin_peak_load, anom_peak_load) # Fit a polynomial function for peak load-daily min T2M.
 
-###### Calculate variance explained for each polynomial ######
-y_true = anom_peak_load # True values are the anomalous peak load.
-mean_y_true = np.nanmean(y_true) # Mean of the true peak load anomaly values.
-tss = np.sum((y_true - mean_y_true) **2) # Now calculate the total sum of squares (TSS).
-
-# Now calculate residual sum of squares for T2M daily average.
-y_pred_t2m = eqn_t2m(t2m_peak_load) # This is the predicted peak load for the daily average T2M model.
-rss_t2m = np.nansum((y_true - y_pred_t2m)**2) # Residual sum of squares for daily average T2M model (RSS).
-# Now calculate residual sum of squares for T2M daily min.
-y_pred_tmin = eqn_tmin(tmin_peak_load) # This is the predicted peak load for the daily min T2M model.
-rss_tmin = np.nansum((y_true - y_pred_tmin) **2)
-# Now calculate the R squared value but with respect to the polynomial.
-R2_t2m = 1-(rss_t2m/tss)
-R2_tmin = 1-(rss_tmin/tss)
-
+###### Calculate coefficient of determination for each polynomial ######
+R2_t2m = funcs.rsquared(anom_peak_load, eqn_t2m(t2m_peak_load))
+R2_tmin = funcs.rsquared(anom_peak_load, eqn_tmin(tmin_peak_load))
 
 ###### Plot scatter plots for each model ######
-
 # First, anomalous peak load against daily average T2M ######
 fig = plt.figure(figsize = (10,5)) # Generate figure.
 ax = fig.add_subplot(1, 2, 1) # Add subplot.
