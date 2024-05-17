@@ -1,21 +1,13 @@
 ###### Import modules ######
-from calendar import month
 import sys
 sys.path.insert(2, '/share/data1/Students/ollie/CAOs/project-cold-load')
 import numpy as np
-import pandas as pd
-from datetime import datetime, timedelta
 import os
-from glob import glob
 from tqdm import tqdm
 import matplotlib.pyplot as plt
-from scipy.stats import pearsonr
-from mpl_toolkits.axes_grid1 import AxesGrid
-import scipy.stats
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
-from shapely.geometry import shape, Polygon, Point
-from shapely import vectorized
+from shapely.geometry import shape, Point
 import geopandas as gpd
 from utils import funcs
 
@@ -95,13 +87,16 @@ lon1, lon2 = 180, 330
 era5_t2m, era5_time, era5_lat, era5_lon = funcs.format_daily_ERA5(var = 't2m', level = None, lat_bounds = [lat1, lat2], lon_bounds = [lon1, lon2], year_bounds = [1991, year2], months = ['01', '02', '03', '11', '12'], ndays = 151, isentropic = False)
 
 ###### Now get anomalies ######
+# Array of years to read in.
 years_arr = np.arange(1991, year2+1, 1)
-
-ltm = np.nanmean(era5_t2m[np.where(years_arr == 1991)[0][0]:np.where(years_arr == 2020)[0][0]+1], axis = 0)
-
+# Select climo years.
+climo_year1, climo_year2 = 1991, 2020
+# Take the mean of the T2M array between selected climo years.
+ltm = np.nanmean(era5_t2m[np.where(years_arr == climo_year1)[0][0]:np.where(years_arr == climo_year2)[0][0]+1], axis = 0)
+# Get anomalies.
 anom = era5_t2m - ltm
 
-# Reshape T2M ddaily average data to (days,).
+# Reshape T2M daily average data and dates to (days,) in the first dimension.
 t2m_reshape = anom.reshape(anom.shape[0]*anom.shape[1], anom.shape[2], anom.shape[3]) # For degrees C.
 t2m_time_reshape = era5_time.reshape(era5_time.shape[0]*era5_time.shape[1])
 
@@ -111,29 +106,14 @@ for i in range(len(anom_peak_load)): # Loop through the shape of peak load dates
     ind = np.where(t2m_time_reshape == date_load[i])[0][0] # Find where the ERA5 time is the same as your dates for peak load.
     t2m_peak_load[i] = t2m_reshape[ind] # Store the ERA5 T2M daily average for that date.
 
-
 ###### Read in regimes ######
 # Go to directory.
 directory = '/share/data1/Students/ollie/CAOs/Data/Energy/Regimes/'
 path = os.chdir(directory)
 # Get filename of regimes file.
 filename = 'detrended_regimes_1950_2023_NDJFM.txt'
-# Set headers for txt file.
-headers = ['Day', 'Regime']
-
-# Read in data for txt file of regimes.
-data = pd.read_csv(filename, delim_whitespace=True, skiprows = [0], names=headers, index_col=False)
-
-# Get regimes and corresponding days.
-days = data['Day'].values
-regimes = data['Regime'].values
-
-# Turn dates into datetimes.
-dates_regime_list = [] # Empty list to store datetime objects.
-for i in range(len(days)): # Loop through days (string format).
-    dates_regime_list.append(datetime.strptime(days[i], '%Y-%m-%d')) # Append associated datetime.
-# Convert list of dates to a python array.
-dates_regime = np.array(dates_regime_list)
+# Read the regimes in with dates.
+regimes, dates_regime = funcs.read_regimes(filename)
 
 ###### Now get the regime for each load day ######
 regime_peak_load_list = [] # Empty list to append the regime for each peak load day.
@@ -166,7 +146,6 @@ ind_pt = np.where((regimes_peak_load == 'PT')&(anom_peak_load >= perc_pt))[0]
 ind_arl = np.where((regimes_peak_load == 'ArL')&(anom_peak_load >= perc_arl))[0]
 
 ###### Now get the T2M patterns associated with each one ######
-
 t2m_akr = np.nanmean(t2m_peak_load[ind_akr], axis = 0)
 t2m_arh = np.nanmean(t2m_peak_load[ind_arh], axis = 0)
 t2m_wcr = np.nanmean(t2m_peak_load[ind_wcr], axis = 0)
@@ -184,11 +163,12 @@ shpfile = shpfile.to_crs('EPSG:4326') # Convert to standard, i.e., PlateCarree.
 # Select the multipolygon.
 geometry = shape(shpfile['geometry'].iloc[-1]) # SPP is in the last index.
 
-
+'''# Select the large SPP polygon.
 poly = geometry.geoms[-11]
 
-# Convert lons.
-new_lon = np.zeros(era5_lon.size)
+
+# Convert lons to +- format.
+new_lon = np.zeros(era5_lon.size) # Array to store lons.
 for i in range(len(era5_lon)):
     if era5_lon[i] <= 180:
         new_lon[i] = era5_lon[i]
@@ -202,13 +182,14 @@ for i in range(len(new_lon)):
         if t == True:
             bin[j, i] = 1
         else:
-            bin[j, i] = 0
+            bin[j, i] = 0'''
 
-# Set updated lats and lons.
+###### Plotting ######
 
 # Mesh the grid.
 lons, lats = np.meshgrid(era5_lon, era5_lat)
 
+# Set updated lat/lon for projection.
 upd_lon1, upd_lon2 = 250, 270
 upd_lat1, upd_lat2 = 50, 27.5
 
@@ -216,86 +197,93 @@ upd_lat1, upd_lat2 = 50, 27.5
 clevs_t2m = np.arange(-10, 10.5, 0.5)
 my_cmap_t2m, norm_t2m = funcs.NormColorMap('RdBu_r', clevs_t2m)
 
-# Plot T2M next
+# Set figure.
 fig = plt.figure(figsize=(12, 9.6))
-ax1 = plt.subplot2grid(shape = (4,6), loc = (0,0), colspan = 2, rowspan = 2,projection=ccrs.PlateCarree(central_longitude = 255))
+
+# AkR first.
+ax1 = plt.subplot2grid(shape = (4,6), loc = (0,0), colspan = 2, rowspan = 2,projection=ccrs.PlateCarree(central_longitude = 255)) # Add subplot.
 #cs = ax1.contourf(lons, lats, np.ma.array(t2m_akr, mask= (bin == 0)), clevs_t2m, norm = norm_t2m, extend='both', transform=ccrs.PlateCarree(), cmap = my_cmap_t2m)
-cs = ax1.contourf(lons, lats, t2m_akr, clevs_t2m, norm = norm_t2m, extend='both', transform=ccrs.PlateCarree(), cmap = my_cmap_t2m)
-for poly in geometry.geoms:
-    if poly.area > 5:
+cs = ax1.contourf(lons, lats, t2m_akr, clevs_t2m, norm = norm_t2m, extend='both', transform=ccrs.PlateCarree(), cmap = my_cmap_t2m) # Contourf AkR.
+for poly in geometry.geoms: # Loop through geometries.
+    if poly.area > 5: # If geometry larger than area 5, use it.
         x,y = poly.exterior.xy
         ax1.plot(x,y,transform=ccrs.PlateCarree(), color = 'k', lw = 2.5)
-    else:
+    else: # Otherwise pass.
         pass
-ax1.coastlines()
-ax1.add_feature(cfeature.BORDERS)
-ax1.add_feature(cfeature.STATES,linewidth =1.5, edgecolor = 'darkslategray')
-ax1.set_extent([upd_lon1, upd_lon2, upd_lat1, upd_lat2], crs=ccrs.PlateCarree())
-plt.title(f"(a) AkR (n = {ind_akr.size})",weight="bold", fontsize = 15)
-plt.tight_layout()
+ax1.coastlines() # Plot coastlines.
+ax1.add_feature(cfeature.BORDERS) # Plot borders.
+ax1.add_feature(cfeature.STATES,linewidth =1.5, edgecolor = 'darkslategray') # Plot states.
+ax1.set_extent([upd_lon1, upd_lon2, upd_lat1, upd_lat2], crs=ccrs.PlateCarree()) # Set extent.
+plt.title(f"(a) AkR (n = {ind_akr.size})",weight="bold", fontsize = 15) # Set title.
+plt.tight_layout() # Tight layout.
 
-ax2 = plt.subplot2grid(shape = (4,6), loc = (0,2), colspan = 2, rowspan = 2,projection=ccrs.PlateCarree(central_longitude = 255))
-cs = ax2.contourf(lons, lats, t2m_arh, clevs_t2m, norm = norm_t2m, extend='both', transform=ccrs.PlateCarree(), cmap = my_cmap_t2m)
-for poly in geometry.geoms:
-    if poly.area > 5:
+# Now ArH.
+ax2 = plt.subplot2grid(shape = (4,6), loc = (0,2), colspan = 2, rowspan = 2,projection=ccrs.PlateCarree(central_longitude = 255)) # Add subplot.
+cs = ax2.contourf(lons, lats, t2m_arh, clevs_t2m, norm = norm_t2m, extend='both', transform=ccrs.PlateCarree(), cmap = my_cmap_t2m) # Contourf ArH.
+for poly in geometry.geoms: # Loop through geometries.
+    if poly.area > 5: # If geometry larger than area 5, use it.
         x,y = poly.exterior.xy
         ax2.plot(x,y,transform=ccrs.PlateCarree(), color = 'k', lw = 2.5)
     else:
-        pass
-ax2.coastlines()
-ax2.add_feature(cfeature.BORDERS)
-ax2.add_feature(cfeature.STATES,linewidth =1.5, edgecolor = 'darkslategray')
-ax2.set_extent([upd_lon1, upd_lon2, upd_lat1, upd_lat2], crs=ccrs.PlateCarree())
-plt.title(f"(b) ArH (n = {ind_arh.size})",weight="bold", fontsize = 15)
-plt.tight_layout()
+        pass # Otherwise pass.
+ax2.coastlines() # Plot coastlines.
+ax2.add_feature(cfeature.BORDERS) # Plot borders.
+ax2.add_feature(cfeature.STATES,linewidth =1.5, edgecolor = 'darkslategray') # Plot states.
+ax2.set_extent([upd_lon1, upd_lon2, upd_lat1, upd_lat2], crs=ccrs.PlateCarree()) # Set extent.
+plt.title(f"(b) ArH (n = {ind_arh.size})",weight="bold", fontsize = 15) # Set title.
+plt.tight_layout() # Tight layout.
 
-ax3 = plt.subplot2grid(shape = (4,6), loc = (0,4), colspan = 2, rowspan = 2,projection=ccrs.PlateCarree(central_longitude = 255))
-cs = ax3.contourf(lons, lats, t2m_pt, clevs_t2m, norm = norm_t2m, extend='both', transform=ccrs.PlateCarree(), cmap = my_cmap_t2m)
-for poly in geometry.geoms:
-    if poly.area > 5:
+# Now PT.
+ax3 = plt.subplot2grid(shape = (4,6), loc = (0,4), colspan = 2, rowspan = 2,projection=ccrs.PlateCarree(central_longitude = 255)) # Add subplot.
+cs = ax3.contourf(lons, lats, t2m_pt, clevs_t2m, norm = norm_t2m, extend='both', transform=ccrs.PlateCarree(), cmap = my_cmap_t2m) # Contourf PT.
+for poly in geometry.geoms: # Loop through geometries.
+    if poly.area > 5: # If geometry larger than area 5, use it.
         x,y = poly.exterior.xy
         ax3.plot(x,y,transform=ccrs.PlateCarree(), color = 'k', lw = 2.5)
     else:
-        pass
-ax3.coastlines()
-ax3.add_feature(cfeature.BORDERS)
-ax3.add_feature(cfeature.STATES,linewidth =1.5, edgecolor = 'darkslategray')
-ax3.set_extent([upd_lon1, upd_lon2, upd_lat1, upd_lat2], crs=ccrs.PlateCarree())
-plt.title(f"(c) PT (n = {ind_pt.size})",weight="bold", fontsize = 15)
-plt.tight_layout()
+        pass # Otherwise pass.
+ax3.coastlines() # Plot coastlines.
+ax3.add_feature(cfeature.BORDERS) # Plot borders.
+ax3.add_feature(cfeature.STATES,linewidth =1.5, edgecolor = 'darkslategray') # Plot states.
+ax3.set_extent([upd_lon1, upd_lon2, upd_lat1, upd_lat2], crs=ccrs.PlateCarree()) # Set extent.
+plt.title(f"(c) PT (n = {ind_pt.size})",weight="bold", fontsize = 15) # Set title.
+plt.tight_layout() # Tight layout.
 
-ax4 = plt.subplot2grid(shape = (4,6), loc = (2,1), colspan = 2, rowspan = 2,projection=ccrs.PlateCarree(central_longitude = 255))
-cs = ax4.contourf(lons, lats, t2m_wcr, clevs_t2m, norm = norm_t2m, extend='both', transform=ccrs.PlateCarree(), cmap = my_cmap_t2m)
-for poly in geometry.geoms:
-    if poly.area > 5:
+# Now WCR.
+ax4 = plt.subplot2grid(shape = (4,6), loc = (2,1), colspan = 2, rowspan = 2,projection=ccrs.PlateCarree(central_longitude = 255)) # Add subplot.
+cs = ax4.contourf(lons, lats, t2m_wcr, clevs_t2m, norm = norm_t2m, extend='both', transform=ccrs.PlateCarree(), cmap = my_cmap_t2m) # Contourf WCR.
+for poly in geometry.geoms: # Loop through geometries.
+    if poly.area > 5: # If geometry larger than area 5, use it.
         x,y = poly.exterior.xy
         ax4.plot(x,y,transform=ccrs.PlateCarree(), color = 'k', lw = 2.5)
     else:
-        pass
-ax4.coastlines()
-ax4.add_feature(cfeature.BORDERS)
-ax4.add_feature(cfeature.STATES, linewidth =1.5, edgecolor = 'darkslategray')
-ax4.set_extent([upd_lon1, upd_lon2, upd_lat1, upd_lat2], crs=ccrs.PlateCarree())
-plt.title(f"(d) WCR (n = {ind_wcr.size})",weight="bold", fontsize = 15)
-plt.tight_layout()
+        pass # Otherwise pass.
+ax4.coastlines() # Plot coastlines.
+ax4.add_feature(cfeature.BORDERS) # Plot borders.
+ax4.add_feature(cfeature.STATES, linewidth =1.5, edgecolor = 'darkslategray') # Plot states.
+ax4.set_extent([upd_lon1, upd_lon2, upd_lat1, upd_lat2], crs=ccrs.PlateCarree()) # Set extent.
+plt.title(f"(d) WCR (n = {ind_wcr.size})",weight="bold", fontsize = 15) # Set title.
+plt.tight_layout() # Tight layout.
 
-ax5 = plt.subplot2grid(shape = (4,6), loc = (2,3), colspan = 2, rowspan = 2,projection=ccrs.PlateCarree(central_longitude = 255))
-cs = ax5.contourf(lons, lats, t2m_arl, clevs_t2m, norm = norm_t2m, extend='both', transform=ccrs.PlateCarree(), cmap = my_cmap_t2m)
-for poly in geometry.geoms:
-    if poly.area > 5:
+# Plot ArL.
+ax5 = plt.subplot2grid(shape = (4,6), loc = (2,3), colspan = 2, rowspan = 2,projection=ccrs.PlateCarree(central_longitude = 255)) # Add subplot.
+cs = ax5.contourf(lons, lats, t2m_arl, clevs_t2m, norm = norm_t2m, extend='both', transform=ccrs.PlateCarree(), cmap = my_cmap_t2m) # Contourf ArL.
+for poly in geometry.geoms: # Loop through geometries.
+    if poly.area > 5: # If geometry larger than area 5, use it.
         x,y = poly.exterior.xy
         ax5.plot(x,y,transform=ccrs.PlateCarree(), color = 'k', lw = 2.5)
     else:
-        pass
-ax5.coastlines()
-ax5.add_feature(cfeature.BORDERS)
-ax5.add_feature(cfeature.STATES, linewidth =1.5, edgecolor = 'darkslategray')
-ax5.set_extent([upd_lon1, upd_lon2, upd_lat1, upd_lat2], crs=ccrs.PlateCarree())
-plt.title(f"(e) ArL (n = {ind_arl.size})",weight="bold", fontsize = 15)
-plt.tight_layout()
+        pass # Otherwise pass.
+ax5.coastlines() # Plot coastlines.
+ax5.add_feature(cfeature.BORDERS) # Plot borders.
+ax5.add_feature(cfeature.STATES, linewidth =1.5, edgecolor = 'darkslategray') # Plot states.
+ax5.set_extent([upd_lon1, upd_lon2, upd_lat1, upd_lat2], crs=ccrs.PlateCarree()) # Set extent.
+plt.title(f"(e) ArL (n = {ind_arl.size})",weight="bold", fontsize = 15) # Set title.
+plt.tight_layout() # Tight layout.
 
-cb_ax = fig.add_axes([0.05, -0.02, 0.91, 0.04])
-cbar = fig.colorbar(cs, cax=cb_ax,orientation="horizontal",ticks=np.arange(-10, 12, 2),extend="both",spacing='proportional')
-cbar.set_label("2m Temperature Anomaly ($^\circ$C)", fontsize = 14)
-cbar.ax.tick_params(labelsize=12)
-plt.savefig("/share/data1/Students/ollie/CAOs/project-cold-load/Figures/Regimes/regimes_extrload_t2m.png", bbox_inches = 'tight', dpi = 500)
+# Set uo colorbar.
+cb_ax = fig.add_axes([0.05, -0.02, 0.91, 0.04]) # Axes for colorbar.
+cbar = fig.colorbar(cs, cax=cb_ax,orientation="horizontal",ticks=np.arange(-10, 12, 2),extend="both",spacing='proportional') # Plot colorbar.
+cbar.set_label("2m Temperature Anomaly ($^\circ$C)", fontsize = 14) # Colorbar label.
+cbar.ax.tick_params(labelsize=12) # Colorbar ticks.
+plt.savefig("/share/data1/Students/ollie/CAOs/project-cold-load/Figures/Regimes/regimes_extrload_t2m.png", bbox_inches = 'tight', dpi = 500) # Save figure.

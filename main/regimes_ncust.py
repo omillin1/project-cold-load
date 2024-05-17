@@ -1,18 +1,15 @@
 ###### Import modules ######
-from calendar import month
 from sklearn.neighbors import KernelDensity
 from sklearn.model_selection import GridSearchCV
 import sys
 sys.path.insert(2, '/share/data1/Students/ollie/CAOs/project-cold-load')
 import numpy as np
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime
 import os
-from glob import glob
 from tqdm import tqdm
 import matplotlib.pyplot as plt
-from scipy.stats import pearsonr, percentileofscore
-import scipy.stats
+from scipy.stats import percentileofscore
 from utils import funcs
 
 ###### Set up regions to retrieve and years to use ######
@@ -89,22 +86,8 @@ directory = '/share/data1/Students/ollie/CAOs/Data/Energy/Regimes/'
 path = os.chdir(directory)
 # Get filename of regimes file.
 filename = 'detrended_regimes_1950_2023_NDJFM.txt'
-# Set headers for txt file.
-headers = ['Day', 'Regime']
-
-# Read in data for txt file of regimes.
-data = pd.read_csv(filename, delim_whitespace=True, skiprows = [0], names=headers, index_col=False)
-
-# Get regimes and corresponding days.
-days = data['Day'].values
-regimes = data['Regime'].values
-
-# Turn dates into datetimes.
-dates_regime_list = [] # Empty list to store datetime objects.
-for i in range(len(days)): # Loop through days (string format).
-    dates_regime_list.append(datetime.strptime(days[i], '%Y-%m-%d')) # Append associated datetime.
-# Convert list of dates to a python array.
-dates_regime = np.array(dates_regime_list)
+# Read the regimes in with dates.
+regimes, dates_regime = funcs.read_regimes(filename)
 
 ###### Now get the regime for each load day ######
 regime_peak_load_list = [] # Empty list to append the regime for each peak load day.
@@ -147,7 +130,6 @@ for i in range(len(perc_arr)):
     wcr_rr[i] = p_wcr/p_all # WCR RR.
     arl_rr[i] = p_arl/p_all # ArL RR.
     pt_rr[i] = p_pt/p_all # PT RR.
-
 
 ###### Bootstrapping for the risk ratios ######
 # Number of samples.
@@ -201,11 +183,11 @@ pt_bars = np.zeros((2, perc_arr.size))
 
 # Now loop through each percentile and calculate the upper and lower bounds of confidence.
 for i in range(perc_arr.size):
-    akr_bars[0, i], akr_bars[1, i] = np.nanpercentile(rr_boot_akr[:,i], q = 2.5) - akr_rr[i], np.nanpercentile(rr_boot_akr[:,i], q = 97.5) - akr_rr[i]
-    arh_bars[0, i], arh_bars[1, i] = np.nanpercentile(rr_boot_arh[:,i], q = 2.5) - arh_rr[i], np.nanpercentile(rr_boot_arh[:,i], q = 97.5) - arh_rr[i]
-    wcr_bars[0, i], wcr_bars[1, i] = np.nanpercentile(rr_boot_wcr[:,i], q = 2.5) - wcr_rr[i], np.nanpercentile(rr_boot_wcr[:,i], q = 97.5) - wcr_rr[i]
-    arl_bars[0, i], arl_bars[1, i] = np.nanpercentile(rr_boot_arl[:,i], q = 2.5) - arl_rr[i], np.nanpercentile(rr_boot_arl[:,i], q = 97.5) - arl_rr[i]
-    pt_bars[0, i], pt_bars[1, i] = np.nanpercentile(rr_boot_pt[:,i], q = 2.5) - pt_rr[i], np.nanpercentile(rr_boot_pt[:,i], q = 97.5) - pt_rr[i]
+    akr_bars[0, i], akr_bars[1, i] = np.nanpercentile(rr_boot_akr[:,i], q = perc1) - akr_rr[i], np.nanpercentile(rr_boot_akr[:,i], q = perc2) - akr_rr[i]
+    arh_bars[0, i], arh_bars[1, i] = np.nanpercentile(rr_boot_arh[:,i], q = perc1) - arh_rr[i], np.nanpercentile(rr_boot_arh[:,i], q = perc2) - arh_rr[i]
+    wcr_bars[0, i], wcr_bars[1, i] = np.nanpercentile(rr_boot_wcr[:,i], q = perc1) - wcr_rr[i], np.nanpercentile(rr_boot_wcr[:,i], q = perc2) - wcr_rr[i]
+    arl_bars[0, i], arl_bars[1, i] = np.nanpercentile(rr_boot_arl[:,i], q = perc1) - arl_rr[i], np.nanpercentile(rr_boot_arl[:,i], q = perc2) - arl_rr[i]
+    pt_bars[0, i], pt_bars[1, i] = np.nanpercentile(rr_boot_pt[:,i], q = perc1) - pt_rr[i], np.nanpercentile(rr_boot_pt[:,i], q = perc2) - pt_rr[i]
 
 ###### Get the composite mean anomalies for each regime ######
 mean_akr = np.nanmean(akr_load)
@@ -250,52 +232,53 @@ lst_mean = [mean_akr, mean_arh, mean_wcr, mean_pt, mean_arl]
 # Loop through the percentiles and append the mean value if sig, otherwise nan.
 plot_sig = np.zeros((len(lst_perc)))
 for i in range(len(lst_perc)):
-    if (lst_perc[i] >= 97.5)|(lst_perc[i] <= 2.5):
+    if (lst_perc[i] >= perc2)|(lst_perc[i] <= perc1): # If significant, store mean.
         plot_sig[i] = lst_mean[i]
     else:
-        plot_sig[i] = np.nan
+        plot_sig[i] = np.nan # Non-sig, store nan.
 
 ###### Now the PDFs for the regime load ######
-# Get the PDFs.
+
+# Set out points to fit the PDF.
 points = np.arange(-3, 3.01, 0.01)
 
 # AkR first.
 grid = GridSearchCV(KernelDensity(),
                     {'bandwidth': np.arange(0.1, 30.1, 0.1)},
                     cv=5) # 5-fold cross-validation using KDE.
-grid.fit(akr_load[:, None]) # Use the KDE on the data.
+grid.fit(akr_load[:, None]) # Use the KDE on the AkR data.
 print(grid.best_params_) # Print bandwidth.
-akr_kde = grid.best_estimator_ # Get the kde estimator.
-
+akr_kde = grid.best_estimator_ # Get the kde estimator for AkR.
+# AkR PDF is calculated.
 akr_pdf = np.exp(akr_kde.score_samples(points[:, None]))
 
 # ArH next.
 grid = GridSearchCV(KernelDensity(),
                     {'bandwidth': np.arange(0.1, 30.1, 0.1)},
                     cv=5) # 5-fold cross-validation using KDE.
-grid.fit(arh_load[:, None]) # Use the KDE on the data.
+grid.fit(arh_load[:, None]) # Use the KDE on the ArH data.
 print(grid.best_params_) # Print bandwidth.
-arh_kde = grid.best_estimator_ # Get the kde estimator.
-
+arh_kde = grid.best_estimator_ # Get the kde estimator for ArH.
+# ArH PDF is calculated.
 arh_pdf = np.exp(arh_kde.score_samples(points[:, None]))
 
 # PT next.
 grid = GridSearchCV(KernelDensity(),
                     {'bandwidth': np.arange(0.1, 30.1, 0.1)},
                     cv=5) # 5-fold cross-validation using KDE.
-grid.fit(pt_load[:, None]) # Use the KDE on the data.
+grid.fit(pt_load[:, None]) # Use the KDE on the PT data.
 print(grid.best_params_) # Print bandwidth.
-pt_kde = grid.best_estimator_ # Get the kde estimator.
-
+pt_kde = grid.best_estimator_ # Get the kde estimator for PT.
+# PT PDF is calculated.
 pt_pdf = np.exp(pt_kde.score_samples(points[:, None]))
 
 # WCR next.
 grid = GridSearchCV(KernelDensity(),
                     {'bandwidth': np.arange(0.1, 30.1, 0.1)},
                     cv=5) # 5-fold cross-validation using KDE.
-grid.fit(wcr_load[:, None]) # Use the KDE on the data.
+grid.fit(wcr_load[:, None]) # Use the KDE on the WCR data.
 print(grid.best_params_) # Print bandwidth.
-wcr_kde = grid.best_estimator_ # Get the kde estimator.
+wcr_kde = grid.best_estimator_ # Get the kde estimator for WCR.
 
 wcr_pdf = np.exp(wcr_kde.score_samples(points[:, None]))
 
@@ -303,9 +286,9 @@ wcr_pdf = np.exp(wcr_kde.score_samples(points[:, None]))
 grid = GridSearchCV(KernelDensity(),
                     {'bandwidth': np.arange(0.1, 30.1, 0.1)},
                     cv=5) # 5-fold cross-validation using KDE.
-grid.fit(arl_load[:, None]) # Use the KDE on the data.
+grid.fit(arl_load[:, None]) # Use the KDE on the ArL data.
 print(grid.best_params_) # Print bandwidth.
-arl_kde = grid.best_estimator_ # Get the kde estimator.
+arl_kde = grid.best_estimator_ # Get the kde estimator for ArL.
 
 arl_pdf = np.exp(arl_kde.score_samples(points[:, None]))
 
@@ -313,52 +296,54 @@ arl_pdf = np.exp(arl_kde.score_samples(points[:, None]))
 grid = GridSearchCV(KernelDensity(),
                     {'bandwidth': np.arange(0.1, 30.1, 0.1)},
                     cv=5) # 5-fold cross-validation using KDE.
-grid.fit(anom_peak_load[:, None]) # Use the KDE on the data.
+grid.fit(anom_peak_load[:, None]) # Use the KDE on the total data.
 print(grid.best_params_) # Print bandwidth.
-all_kde = grid.best_estimator_ # Get the kde estimator.
+all_kde = grid.best_estimator_ # Get the kde estimator for ALL.
 
 all_pdf = np.exp(all_kde.score_samples(points[:, None]))
 
 
-###### New way of plotting ######
-# Plot.
-fig = plt.figure(figsize=(12, 10))
-ax1 = plt.subplot2grid(shape = (4,4), loc = (0,0), colspan = 2, rowspan = 2)
-ax1.plot(points, akr_pdf, color = 'darkorange', lw = 2, label = 'AkR')
-ax1.plot(points, arh_pdf, color = 'darkred', lw = 2, label = 'ArH')
-ax1.plot(points, pt_pdf, color = 'darkgreen', lw = 2, label = 'PT')
-ax1.plot(points, wcr_pdf, color = 'darkblue', lw = 2, label = 'WCR')
-ax1.plot(points, arl_pdf, color = 'purple', lw = 2, label = 'ArL')
-ax1.plot(points, all_pdf, color = 'black', lw = 2, label = 'All')
-plt.axvline(x = 0, color = 'black', lw = 2, ls = '--')
-ax1.set_xticks(np.arange(-5, 6, 1))
-ax1.set_yticks(np.arange(0, 1.2, 0.2))
-ax1.set_xlim([-2, 2])
-ax1.set_ylim([0, 1])
-ax1.set_xlabel('Peak Load Anomaly (MWh/1000 Cust)', fontsize = 13)
-ax1.set_ylabel('Probability Density', fontsize = 13)
-ax1.set_title('a) Probability Density Function', weight = 'bold', fontsize = 14)
-ax1.legend()
+###### PLOT THE FIGURES ######
+fig = plt.figure(figsize=(12, 10)) # Set up figure.
 
-ax2 = plt.subplot2grid(shape = (4,4), loc = (0,2), colspan = 2, rowspan = 2)
-reg_labs = ['AkR', 'ArH', 'WCR', 'PT', 'ArL']
-mean_anoms = [mean_akr, mean_arh, mean_wcr, mean_pt, mean_arl]
-ax2.bar(reg_labs, mean_anoms, color = ['darkorange', 'darkred', 'darkblue', 'darkgreen', 'purple'], edgecolor = 'black', label = reg_labs)
-ax2.plot(reg_labs, plot_sig, marker="D", linestyle="", alpha=1, color="white", markeredgecolor = 'black')
-ax2.set_xlabel("Regime", fontsize = 13)
-ax2.set_ylabel('Peak Load Anomaly (MWh/1000 Cust)', fontsize = 13)
+# Plot the PDFs for each regime.
+ax1 = plt.subplot2grid(shape = (4,4), loc = (0,0), colspan = 2, rowspan = 2) # Subplot.
+ax1.plot(points, akr_pdf, color = 'darkorange', lw = 2, label = 'AkR') # Plot AkR.
+ax1.plot(points, arh_pdf, color = 'darkred', lw = 2, label = 'ArH') # Plot ArH.
+ax1.plot(points, pt_pdf, color = 'darkgreen', lw = 2, label = 'PT') # Plot PT.
+ax1.plot(points, wcr_pdf, color = 'darkblue', lw = 2, label = 'WCR') # Plot WCR.
+ax1.plot(points, arl_pdf, color = 'purple', lw = 2, label = 'ArL') # Plot ArL.
+ax1.plot(points, all_pdf, color = 'black', lw = 2, label = 'All') # Plot ALL.
+plt.axvline(x = 0, color = 'black', lw = 2, ls = '--') # Vertical dashed line for 0 line.
+ax1.set_xticks(np.arange(-5, 6, 1)) # Set xticks.
+ax1.set_yticks(np.arange(0, 1.2, 0.2)) # Set yticks.
+ax1.set_xlim([-2, 2]) # Set x-lim.
+ax1.set_ylim([0, 1]) # Set y-lim.
+ax1.set_xlabel('Peak Load Anomaly (MWh/1000 Cust)', fontsize = 13) # Set x label.
+ax1.set_ylabel('Probability Density', fontsize = 13) # Set y label.
+ax1.set_title('a) Probability Density Function', weight = 'bold', fontsize = 14) # Set title.
+ax1.legend() # Set legend.
+
+# Plot the mean loads by regime.
+ax2 = plt.subplot2grid(shape = (4,4), loc = (0,2), colspan = 2, rowspan = 2) # Subplot.
+reg_labs = ['AkR', 'ArH', 'WCR', 'PT', 'ArL'] # Labels for the regimes.
+mean_anoms = [mean_akr, mean_arh, mean_wcr, mean_pt, mean_arl] # Mean anomalies for the bar plot for each regime.
+ax2.bar(reg_labs, mean_anoms, color = ['darkorange', 'darkred', 'darkblue', 'darkgreen', 'purple'], edgecolor = 'black', label = reg_labs) # Barplot.
+ax2.plot(reg_labs, plot_sig, marker="D", linestyle="", alpha=1, color="white", markeredgecolor = 'black') # Plot the dots for significance.
+ax2.set_xlabel("Regime", fontsize = 13) # Set x label.
+ax2.set_ylabel('Peak Load Anomaly (MWh/1000 Cust)', fontsize = 13) # Set y label.
 ax2.set_title("b) Composite Peak Load Anomaly", weight = 'bold', fontsize = 14) # Set the title.
-ax2.set_yticks(np.arange(-0.2, 0.25, 0.05))
-ax2.set_ylim([-0.2, 0.2])
+ax2.set_yticks(np.arange(-0.2, 0.25, 0.05)) # Set y ticks.
+ax2.set_ylim([-0.2, 0.2]) # Set y lim.
 ax2.set_xticklabels(reg_labs, rotation=45, fontsize = 10) # Plot the xtick labels.
-plt.axhline(y=0, lw = 1, ls = '-', color = 'black')
-ax2.legend()
+plt.axhline(y=0, lw = 1, ls = '-', color = 'black') # Horizontal line for 0 line.
+ax2.legend() # Set legend.
 
-ax3 = plt.subplot2grid(shape = (4,4), loc = (2,1), colspan = 2, rowspan = 2)
+# Plot the risk ratios.
+ax3 = plt.subplot2grid(shape = (4,4), loc = (2,1), colspan = 2, rowspan = 2) # Subplot.
 X = np.arange(1, 4, 1) # Get x tick numbers.
 labels = [f'{int(perc_arr[0])}th',f'{int(perc_arr[1])}th', f'{perc_arr[2]}th'] # Set out labels of percentiles.
-bottom = 1
-#reg_bar = funcs.subcategorybar(X, [akr_rr,arh_rr,wcr_rr,pt_rr,arl_rr],  bt = bottom, colors = ['darkorange', 'darkred', 'darkblue', 'darkgreen', 'purple']) # Plot the bars.
+bottom = 1 # Set bottom value for risk ratio plot.
 reg_bar = funcs.subcategorybar(X, [akr_rr,arh_rr,wcr_rr,pt_rr,arl_rr], [np.absolute(akr_bars), np.absolute(arh_bars), np.absolute(wcr_bars), np.absolute(pt_bars), np.absolute(arl_bars)], error_col = 'gray',  bt = bottom, colors = ['darkorange', 'darkred', 'darkblue', 'darkgreen', 'purple'], capsize = 10) # Plot the bars.
 ax3.set_xticklabels(labels, rotation=45, fontsize = 10) # Plot the xtick labels.
 ax3.set_yticks(np.arange(0, 3, 0.5)) # Plot the y ticks.
@@ -367,6 +352,6 @@ ax3.set_ylabel("Risk Ratio", fontsize = 13) # Plot the y label.
 ax3.set_xlabel("Percentile", fontsize = 13) # Plot the x label.
 ax3.set_title("c) Extreme Peak Load Risk Ratios", weight = 'bold', fontsize = 14) # Set the title.
 ax3.legend(reg_labs) # Put a legend.
-plt.axhline(y=1, lw = 1, ls = '-', color = 'black')
-fig.tight_layout()
-plt.savefig("/share/data1/Students/ollie/CAOs/project-cold-load/Figures/Regimes/regimes_load.png", bbox_inches = 'tight', dpi = 500)
+plt.axhline(y=1, lw = 1, ls = '-', color = 'black') # Horizontal line for the 1 risk ratio value.
+fig.tight_layout() # Tight layout.
+plt.savefig("/share/data1/Students/ollie/CAOs/project-cold-load/Figures/Regimes/regimes_load.png", bbox_inches = 'tight', dpi = 500) # Save figure.

@@ -3,8 +3,6 @@ import sys
 sys.path.insert(2, '/share/data1/Students/ollie/CAOs/project-cold-load/')
 import numpy as np
 import os
-from datetime import datetime,timedelta
-from netCDF4 import Dataset,num2date
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 from tqdm import tqdm
@@ -123,13 +121,14 @@ ratios = []
 for i in range(ncluster):
 	ratio = 100*(len(np.where(model_clust==i)[0])/float(len(model_clust)))
 	ratios.append(ratio)
-
+# Sort the ratios.
 ratios_sorted = sorted(ratios)
+# Keep original ratios and ratios sorted.
 ratios = np.array(ratios); ratios_sorted=np.array(ratios_sorted)
 
 # make new array to input the new identifiers
 new_clust = np.zeros(np.shape(model_clust))
-
+# Loop through each cluster and give each cluster 0-4 based on their occupancy frequency by reassigning the id.
 for i in range(ncluster):
 	new_id = np.where(ratios_sorted==ratios[i])[0][0]
 	new_clust[np.where(model_clust==i)[0]]=new_id
