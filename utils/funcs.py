@@ -20,7 +20,7 @@ def NormColorMap(cmap_select, my_bounds):
     Parameters
     ---------
     cmap_select: String, the cmap to normalize.
-    bounds: Numpy array, the array of levels in the colormap. Has to be diverging.
+    my_bounds: Numpy array, the array of levels in the colormap. Has to be diverging.
 
     Returns
     ---------
@@ -44,7 +44,7 @@ def NormColorMap(cmap_select, my_bounds):
 
     return my_cmap, norm
 
-def format_daily_ERA5(var = 'hgt', level = 500, lat_bounds = [90, 0], lon_bounds = [0, 359.5], year_bounds = [1996, 2014], months = ['05','06','07','08','09'], ndays = 153, isentropic = True):
+def format_daily_ERA5(var = 'hgt', level = 500, lat_bounds = [90, 0], lon_bounds = [0, 359.5], year_bounds = [1996, 2014], months = ['11','12','01','02','03'], ndays = 151, isentropic = False):
     '''
     Function to format 3D ERA5 daily data into (year, day in season, lat, lon) at a specific pressure level.
     This just makes it easier to subtract climatology.
@@ -421,7 +421,6 @@ def read_early_load(div = 'OKGE', year1 = 1999, month_bnd = [3, 11]):
 
     # Now get load and region.
     region_arr = energy_frame['Region'].values
-    #print(set(region_arr))
     load_arr = energy_frame['Load'].values
 
     # We want just OKGE to start.
@@ -456,7 +455,7 @@ def read_early_load(div = 'OKGE', year1 = 1999, month_bnd = [3, 11]):
         coords=dict(
             time=dates_restr
         ),
-        attrs=dict(description=f"Load (MW) for {div}"),
+        attrs=dict(description=f"Load (MWh) for {div}"),
     )
 
     # Sort by time.
@@ -480,7 +479,7 @@ def read_early_load(div = 'OKGE', year1 = 1999, month_bnd = [3, 11]):
 
 
 def read_late_load(year1, year2, months=['01', '02', '03', '04', '10', '11', '12'], month_bnd = [3, 11], div = 'OKGE'):
-    """Retrieves hourly SPP load for 2011-2023.
+    """Retrieves hourly SPP load for 2011 onwards.
         
     Parameters
     ---------

@@ -166,27 +166,6 @@ shpfile = shpfile.to_crs('EPSG:4326') # Convert to standard, i.e., PlateCarree.
 # Select the multipolygon.
 geometry = shape(shpfile['geometry'].iloc[-1]) # SPP is in the last index.
 
-'''# Select the large SPP polygon.
-poly = geometry.geoms[-11]
-
-
-# Convert lons to +- format.
-new_lon = np.zeros(era5_lon.size) # Array to store lons.
-for i in range(len(era5_lon)):
-    if era5_lon[i] <= 180:
-        new_lon[i] = era5_lon[i]
-    else:
-        new_lon[i] = era5_lon[i]-360
-
-bin = np.zeros((era5_lat.size, new_lon.size))
-for i in range(len(new_lon)):
-    for j in range(len(era5_lat)):
-        t = Point([new_lon[i], era5_lat[j]]).within(poly)
-        if t == True:
-            bin[j, i] = 1
-        else:
-            bin[j, i] = 0'''
-
 ###### Plotting ######
 
 # Mesh the grid.
@@ -205,7 +184,6 @@ fig = plt.figure(figsize=(12, 9.6))
 
 # AkR first.
 ax1 = plt.subplot2grid(shape = (4,6), loc = (0,0), colspan = 2, rowspan = 2,projection=ccrs.PlateCarree(central_longitude = 255)) # Add subplot.
-#cs = ax1.contourf(lons, lats, np.ma.array(t2m_akr, mask= (bin == 0)), clevs_t2m, norm = norm_t2m, extend='both', transform=ccrs.PlateCarree(), cmap = my_cmap_t2m)
 cs = ax1.contourf(lons, lats, t2m_akr, clevs_t2m, norm = norm_t2m, extend='both', transform=ccrs.PlateCarree(), cmap = my_cmap_t2m) # Contourf AkR.
 for poly in geometry.geoms: # Loop through geometries.
     if poly.area > 5: # If geometry larger than area 5, use it.
