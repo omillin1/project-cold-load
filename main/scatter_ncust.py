@@ -127,6 +127,7 @@ fig = plt.figure(figsize = (10,5)) # Generate figure.
 ax = fig.add_subplot(1, 2, 1) # Add subplot.
 plt.scatter(t2m_peak_load, anom_peak_load, color = 'black', s = 0.5) # Scatter the data.
 plt.plot(X_fit, Y_fit, color = 'red') # Plot the polynomial model.
+plt.axhline(y=0, lw = 2, color = 'blue', ls = '--')
 plt.xlabel("Temperature ($^\circ$C)", weight = 'bold', fontsize = 13) # Add xlabel.
 plt.ylabel("Peak Load Anomaly (MWh/1000 Customers)", weight = 'bold', fontsize = 12) # Add y label.
 plt.xticks(np.arange(-24, 30, 6)) # Add x ticks.
@@ -142,6 +143,7 @@ plt.tight_layout() # Tight layout.
 ax = fig.add_subplot(1, 2, 2) # Add subplot.
 plt.scatter(tmin_peak_load, anom_peak_load, color = 'black', s = 0.5) # Scatter the data.
 plt.plot(X_fit_tmin, Y_fit_tmin, color = 'red') # Plot the polynomial model.
+plt.axhline(y=0, lw = 2, color = 'blue', ls = '--')
 plt.xlabel("Temperature ($^\circ$C)", weight = 'bold', fontsize = 13) # Add xlabel.
 plt.xticks(np.arange(-24, 30, 6)) # Add x ticks.
 plt.yticks(np.arange(-1.5, 3.5, 0.5)) # Add y ticks.
