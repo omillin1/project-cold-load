@@ -137,6 +137,7 @@ perc_arh = np.percentile(arh_load, q = 90)
 perc_wcr = np.percentile(wcr_load, q = 90)
 perc_pt = np.percentile(pt_load, q = 90)
 perc_arl = np.percentile(arl_load, q = 90)
+perc_all = np.percentile(anom_peak_load, q = 90)
 
 ###### Now find where the threshold is met and is a given regime ######
 ind_akr = np.where((regimes_peak_load == 'AkR')&(anom_peak_load >= perc_akr))[0]
@@ -144,6 +145,7 @@ ind_arh = np.where((regimes_peak_load == 'ArH')&(anom_peak_load >= perc_arh))[0]
 ind_wcr = np.where((regimes_peak_load == 'WCR')&(anom_peak_load >= perc_wcr))[0]
 ind_pt = np.where((regimes_peak_load == 'PT')&(anom_peak_load >= perc_pt))[0]
 ind_arl = np.where((regimes_peak_load == 'ArL')&(anom_peak_load >= perc_arl))[0]
+ind_all = np.where((anom_peak_load >= perc_all))[0]
 
 ###### Now get the T2M patterns associated with each one ######
 t2m_akr = np.nanmean(t2m_peak_load[ind_akr], axis = 0)
@@ -151,6 +153,7 @@ t2m_arh = np.nanmean(t2m_peak_load[ind_arh], axis = 0)
 t2m_wcr = np.nanmean(t2m_peak_load[ind_wcr], axis = 0)
 t2m_pt = np.nanmean(t2m_peak_load[ind_pt], axis = 0)
 t2m_arl = np.nanmean(t2m_peak_load[ind_arl], axis = 0)
+t2m_all = np.nanmean(t2m_peak_load[ind_all], axis = 0)
 
 ###### Now get the Southwest Power Pool shapefile ######
 dir = '/share/data1/Students/ollie/CAOs/Data/Energy/Shapefiles/'
@@ -250,7 +253,7 @@ plt.title(f"(c) PT (n = {ind_pt.size})",weight="bold", fontsize = 15) # Set titl
 plt.tight_layout() # Tight layout.
 
 # Now WCR.
-ax4 = plt.subplot2grid(shape = (4,6), loc = (2,1), colspan = 2, rowspan = 2,projection=ccrs.PlateCarree(central_longitude = 255)) # Add subplot.
+ax4 = plt.subplot2grid(shape = (4,6), loc = (2,0), colspan = 2, rowspan = 2,projection=ccrs.PlateCarree(central_longitude = 255)) # Add subplot.
 cs = ax4.contourf(lons, lats, t2m_wcr, clevs_t2m, norm = norm_t2m, extend='both', transform=ccrs.PlateCarree(), cmap = my_cmap_t2m) # Contourf WCR.
 for poly in geometry.geoms: # Loop through geometries.
     if poly.area > 5: # If geometry larger than area 5, use it.
@@ -266,7 +269,7 @@ plt.title(f"(d) WCR (n = {ind_wcr.size})",weight="bold", fontsize = 15) # Set ti
 plt.tight_layout() # Tight layout.
 
 # Plot ArL.
-ax5 = plt.subplot2grid(shape = (4,6), loc = (2,3), colspan = 2, rowspan = 2,projection=ccrs.PlateCarree(central_longitude = 255)) # Add subplot.
+ax5 = plt.subplot2grid(shape = (4,6), loc = (2,2), colspan = 2, rowspan = 2,projection=ccrs.PlateCarree(central_longitude = 255)) # Add subplot.
 cs = ax5.contourf(lons, lats, t2m_arl, clevs_t2m, norm = norm_t2m, extend='both', transform=ccrs.PlateCarree(), cmap = my_cmap_t2m) # Contourf ArL.
 for poly in geometry.geoms: # Loop through geometries.
     if poly.area > 5: # If geometry larger than area 5, use it.
@@ -279,6 +282,22 @@ ax5.add_feature(cfeature.BORDERS) # Plot borders.
 ax5.add_feature(cfeature.STATES, linewidth =1.5, edgecolor = 'darkslategray') # Plot states.
 ax5.set_extent([upd_lon1, upd_lon2, upd_lat1, upd_lat2], crs=ccrs.PlateCarree()) # Set extent.
 plt.title(f"(e) ArL (n = {ind_arl.size})",weight="bold", fontsize = 15) # Set title.
+plt.tight_layout() # Tight layout.
+
+# Plot All.
+ax6 = plt.subplot2grid(shape = (4,6), loc = (2,4), colspan = 2, rowspan = 2,projection=ccrs.PlateCarree(central_longitude = 255)) # Add subplot.
+cs = ax6.contourf(lons, lats, t2m_all, clevs_t2m, norm = norm_t2m, extend='both', transform=ccrs.PlateCarree(), cmap = my_cmap_t2m) # Contourf All.
+for poly in geometry.geoms: # Loop through geometries.
+    if poly.area > 5: # If geometry larger than area 5, use it.
+        x,y = poly.exterior.xy
+        ax6.plot(x,y,transform=ccrs.PlateCarree(), color = 'k', lw = 2.5)
+    else:
+        pass # Otherwise pass.
+ax6.coastlines() # Plot coastlines.
+ax6.add_feature(cfeature.BORDERS) # Plot borders.
+ax6.add_feature(cfeature.STATES, linewidth =1.5, edgecolor = 'darkslategray') # Plot states.
+ax6.set_extent([upd_lon1, upd_lon2, upd_lat1, upd_lat2], crs=ccrs.PlateCarree()) # Set extent.
+plt.title(f"(f) All (n = {ind_all.size})",weight="bold", fontsize = 15) # Set title.
 plt.tight_layout() # Tight layout.
 
 # Set uo colorbar.

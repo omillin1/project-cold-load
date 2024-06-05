@@ -9,7 +9,7 @@ from datetime import datetime
 import os
 from tqdm import tqdm
 import matplotlib.pyplot as plt
-from scipy.stats import percentileofscore
+from scipy.stats import percentileofscore, skew, kurtosis
 from utils import funcs
 
 ###### Set up regions to retrieve and years to use ######
@@ -103,6 +103,32 @@ arh_load = anom_peak_load[np.where(regimes_peak_load == 'ArH')[0]] # ArH.
 pt_load = anom_peak_load[np.where(regimes_peak_load == 'PT')[0]] # PT.
 wcr_load = anom_peak_load[np.where(regimes_peak_load == 'WCR')[0]] # WCR.
 arl_load = anom_peak_load[np.where(regimes_peak_load == 'ArL')[0]] # ArL.
+
+###### Skewness of data ######
+akr_skew = skew(akr_load)
+arh_skew = skew(arh_load)
+wcr_skew = skew(wcr_load)
+pt_skew = skew(pt_load)
+arl_skew = skew(arl_load)
+all_skew = skew(anom_peak_load)
+print("AkR Skew is",np.round(akr_skew, 2))
+print("ArH Skew is",np.round(arh_skew, 2))
+print("WCR Skew is",np.round(wcr_skew, 2))
+print("PT Skew is",np.round(pt_skew, 2))
+print("ArL Skew is",np.round(arl_skew, 2))
+
+###### Kurtosis of data ######
+akr_kur = kurtosis(akr_load)
+arh_kur = kurtosis(arh_load)
+wcr_kur = kurtosis(wcr_load)
+pt_kur = kurtosis(pt_load)
+arl_kur = kurtosis(arl_load)
+all_kur = kurtosis(anom_peak_load)
+print("AkR Kurtosis is",np.round(akr_kur, 2))
+print("ArH Kurtosis is",np.round(arh_kur, 2))
+print("WCR Kurtosis is",np.round(wcr_kur, 2))
+print("PT Kurtosis is",np.round(pt_kur, 2))
+print("ArL Kurtosis is",np.round(arl_kur, 2))
 
 ###### Now calculate risk ratios ######
 # Set up the percentiles array to do risk ratios for.
@@ -304,16 +330,16 @@ all_pdf = np.exp(all_kde.score_samples(points[:, None]))
 
 
 ###### PLOT THE FIGURES ######
-fig = plt.figure(figsize=(12, 10)) # Set up figure.
+fig = plt.figure(figsize=(12.5, 10)) # Set up figure.
 
 # Plot the PDFs for each regime.
 ax1 = plt.subplot2grid(shape = (4,4), loc = (0,0), colspan = 2, rowspan = 2) # Subplot.
-ax1.plot(points, akr_pdf, color = 'darkorange', lw = 2, label = 'AkR') # Plot AkR.
-ax1.plot(points, arh_pdf, color = 'darkred', lw = 2, label = 'ArH') # Plot ArH.
-ax1.plot(points, pt_pdf, color = 'darkgreen', lw = 2, label = 'PT') # Plot PT.
-ax1.plot(points, wcr_pdf, color = 'darkblue', lw = 2, label = 'WCR') # Plot WCR.
-ax1.plot(points, arl_pdf, color = 'purple', lw = 2, label = 'ArL') # Plot ArL.
-ax1.plot(points, all_pdf, color = 'black', lw = 2, label = 'All') # Plot ALL.
+ax1.plot(points, akr_pdf, color = 'darkorange', lw = 2, label = f'AkR: $\u03B1$={np.round(akr_skew, 2)}, $\u03B2$={np.round(akr_kur, 2)}') # Plot AkR.
+ax1.plot(points, arh_pdf, color = 'darkred', lw = 2, label = f'ArH: $\u03B1$={np.round(arh_skew, 2)}, $\u03B2$={np.round(arh_kur, 2)}') # Plot ArH.
+ax1.plot(points, pt_pdf, color = 'darkgreen', lw = 2, label = f'PT: $\u03B1$={np.round(pt_skew, 2)}, $\u03B2$={np.round(pt_kur, 2)}') # Plot PT.
+ax1.plot(points, wcr_pdf, color = 'darkblue', lw = 2, label = f'WCR: $\u03B1$={np.round(wcr_skew, 2)}, $\u03B2$={np.round(wcr_kur, 2)}') # Plot WCR.
+ax1.plot(points, arl_pdf, color = 'purple', lw = 2, label = f'ArL: $\u03B1$={np.round(arl_skew, 2)}, $\u03B2$={np.round(arl_kur, 2)}') # Plot ArL.
+ax1.plot(points, all_pdf, color = 'black', lw = 2, label = f'All: $\u03B1$={np.round(all_skew, 2)}, $\u03B2$={np.round(all_kur, 2)}') # Plot ALL.
 plt.axvline(x = 0, color = 'black', lw = 2, ls = '--') # Vertical dashed line for 0 line.
 ax1.set_xticks(np.arange(-5, 6, 1)) # Set xticks.
 ax1.set_yticks(np.arange(0, 1.2, 0.2)) # Set yticks.
