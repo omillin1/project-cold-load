@@ -116,6 +116,7 @@ print("ArH Skew is",np.round(arh_skew, 2))
 print("WCR Skew is",np.round(wcr_skew, 2))
 print("PT Skew is",np.round(pt_skew, 2))
 print("ArL Skew is",np.round(arl_skew, 2))
+print("All Skew is",np.round(all_skew, 2))
 
 ###### Kurtosis of data ######
 akr_kur = kurtosis(akr_load)
@@ -129,6 +130,7 @@ print("ArH Kurtosis is",np.round(arh_kur, 2))
 print("WCR Kurtosis is",np.round(wcr_kur, 2))
 print("PT Kurtosis is",np.round(pt_kur, 2))
 print("ArL Kurtosis is",np.round(arl_kur, 2))
+print("All Kurtosis is",np.round(all_kur, 2))
 
 ###### Now calculate risk ratios ######
 # Set up the percentiles array to do risk ratios for.
@@ -305,7 +307,7 @@ grid = GridSearchCV(KernelDensity(),
 grid.fit(wcr_load[:, None]) # Use the KDE on the WCR data.
 print(grid.best_params_) # Print bandwidth.
 wcr_kde = grid.best_estimator_ # Get the kde estimator for WCR.
-
+# WCR PDF is calculated.
 wcr_pdf = np.exp(wcr_kde.score_samples(points[:, None]))
 
 # ArL next.
@@ -315,7 +317,7 @@ grid = GridSearchCV(KernelDensity(),
 grid.fit(arl_load[:, None]) # Use the KDE on the ArL data.
 print(grid.best_params_) # Print bandwidth.
 arl_kde = grid.best_estimator_ # Get the kde estimator for ArL.
-
+# ArL PDF os calculated.
 arl_pdf = np.exp(arl_kde.score_samples(points[:, None]))
 
 # All next.
@@ -325,7 +327,7 @@ grid = GridSearchCV(KernelDensity(),
 grid.fit(anom_peak_load[:, None]) # Use the KDE on the total data.
 print(grid.best_params_) # Print bandwidth.
 all_kde = grid.best_estimator_ # Get the kde estimator for ALL.
-
+# All PDF is calculated.
 all_pdf = np.exp(all_kde.score_samples(points[:, None]))
 
 
