@@ -360,12 +360,12 @@ ax1.legend() # Set legend.
 
 # Plot the PDFs for each regime.
 ax2 = plt.subplot2grid(shape = (4,4), loc = (0,2), colspan = 2, rowspan = 2) # Subplot.
-ax2.plot(points, akr_pdf, color = 'darkorange', lw = 2, label = f'AkR: $\u03C3$={np.round(std_akr, 2)}, $\u03B1$={np.round(akr_skew, 2)}, $\u03B2$={np.round(akr_kur, 2)}') # Plot AkR.
-ax2.plot(points, arh_pdf, color = 'darkred', lw = 2, label = f'ArH: $\u03C3$={np.round(std_arh, 2)}, $\u03B1$={np.round(arh_skew, 2)}, $\u03B2$={np.round(arh_kur, 2)}') # Plot ArH.
-ax2.plot(points, pt_pdf, color = 'darkgreen', lw = 2, label = f'PT: $\u03C3$={np.round(std_pt, 2)}, $\u03B1$={np.round(pt_skew, 2)}, $\u03B2$={np.round(pt_kur, 2)}') # Plot PT.
-ax2.plot(points, wcr_pdf, color = 'darkblue', lw = 2, label = f'WCR: $\u03C3$={np.round(std_wcr, 2)}, $\u03B1$={np.round(wcr_skew, 2)}, $\u03B2$={np.round(wcr_kur, 2)}') # Plot WCR.
-ax2.plot(points, arl_pdf, color = 'purple', lw = 2, label = f'ArL: $\u03C3$={np.round(std_arl, 2)}, $\u03B1$={np.round(arl_skew, 2)}, $\u03B2$={np.round(arl_kur, 2)}') # Plot ArL.
-ax2.plot(points, all_pdf, color = 'black', lw = 2, label = f'All: $\u03C3$={np.round(std_all, 2)}, $\u03B1$={np.round(all_skew, 2)}, $\u03B2$={np.round(all_kur, 2)}') # Plot ALL.
+ax2.plot(points, akr_pdf, color = 'darkorange', lw = 2, label = f'AkR: $\u03C3$={np.round(std_akr, 2)}, $\u03B3$={np.round(akr_skew, 2)}, $\u03BA$={np.round(akr_kur, 2)}') # Plot AkR.
+ax2.plot(points, arh_pdf, color = 'darkred', lw = 2, label = f'ArH: $\u03C3$={np.round(std_arh, 2)}, $\u03B3$={np.round(arh_skew, 2)}, $\u03BA$={np.round(arh_kur, 2)}') # Plot ArH.
+ax2.plot(points, pt_pdf, color = 'darkgreen', lw = 2, label = f'PT: $\u03C3$={np.round(std_pt, 2)}, $\u03B3$={np.round(pt_skew, 2)}, $\u03BA$={np.round(pt_kur, 2)}') # Plot PT.
+ax2.plot(points, wcr_pdf, color = 'darkblue', lw = 2, label = f'WCR: $\u03C3$={np.round(std_wcr, 2)}, $\u03B3$={np.round(wcr_skew, 2)}, $\u03BA$={np.round(wcr_kur, 2)}') # Plot WCR.
+ax2.plot(points, arl_pdf, color = 'purple', lw = 2, label = f'ArL: $\u03C3$={np.round(std_arl, 2)}, $\u03B3$={np.round(arl_skew, 2)}, $\u03BA$={np.round(arl_kur, 2)}') # Plot ArL.
+ax2.plot(points, all_pdf, color = 'black', lw = 2, label = f'All: $\u03C3$={np.round(std_all, 2)}, $\u03B3$={np.round(all_skew, 2)}, $\u03BA$={np.round(all_kur, 2)}') # Plot ALL.
 plt.axvline(x = 0, color = 'black', lw = 2, ls = '--') # Vertical dashed line for 0 line.
 ax2.set_xticks(np.arange(-5, 6, 1)) # Set xticks.
 ax2.set_yticks(np.arange(0, 1.2, 0.2)) # Set yticks.
