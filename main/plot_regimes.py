@@ -11,6 +11,7 @@ import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 from netCDF4 import Dataset
 from shapely.geometry import shape
+from scipy.ndimage import gaussian_filter
 
 ###### Open the hgt and T2M data ######
 # Go to data.
@@ -21,6 +22,7 @@ path = os.chdir(dir)
 nc = Dataset("regime_comps.nc", 'r')
 regime_composite = nc.variables['hgt'][:] # In dam for hgt.
 regime_composite_t2m = nc.variables['t2m'][:] # T2M
+regime_composite_slp = nc.variables['slp'][:] # slp
 latitude = nc.variables['lat'][:] # Latitude
 longitude = nc.variables['lon'][:] # Longitude
 ratios_sorted = nc.variables['ratio'][:] # Ratios
@@ -54,6 +56,8 @@ fig = plt.figure(figsize=(5, 4)) # Set figure up.
 
 ax1 = plt.subplot2grid(shape = (6,4), loc = (0,0), colspan = 2, rowspan = 2,projection=ccrs.PlateCarree(central_longitude = 255)) # Subplot format.
 cs = ax1.contourf(lons, lats, regime_composite[0], clevs_hgt, norm = norm_hgt, extend='both', transform=ccrs.PlateCarree(), cmap = my_cmap_hgt) # Contourf first regime.
+lines = ax1.contour(lons, lats, gaussian_filter(regime_composite_slp[0], sigma = 1.5), np.arange(992, 1036, 4), colors = 'purple', linewidths =1, transform=ccrs.PlateCarree()) # Contour SLP first regime.
+ax1.clabel(lines, fontsize = 3, inline_spacing = 1, colors = 'black')
 ax1.coastlines() # Add coastlines.
 ax1.add_feature(cfeature.BORDERS) # Add borders.
 ax1.set_extent([lon1, lon2, lat1, lat2], crs=ccrs.PlateCarree()) # Set extent.
@@ -61,6 +65,8 @@ plt.title(f"(a) AkR: {np.round(ratios_sorted[0], 1)}%",weight="bold") # Set titl
 
 ax2 = plt.subplot2grid(shape = (6,4), loc = (0,2), colspan = 2, rowspan = 2,projection=ccrs.PlateCarree(central_longitude = 255)) # Subplot format.
 cs = ax2.contourf(lons, lats, regime_composite[1], clevs_hgt, norm = norm_hgt, extend='both', transform=ccrs.PlateCarree(), cmap = my_cmap_hgt) # Contourf second regime.
+lines = ax2.contour(lons, lats, gaussian_filter(regime_composite_slp[1], sigma = 1.5), np.arange(992, 1036, 4), colors = 'purple', linewidths =1, transform=ccrs.PlateCarree()) # Contour SLP second regime.
+ax2.clabel(lines, fontsize = 3, inline_spacing = 1, colors = 'black')
 ax2.coastlines() # Add coastlines.
 ax2.add_feature(cfeature.BORDERS) # Add borders.
 ax2.set_extent([lon1, lon2, lat1, lat2], crs=ccrs.PlateCarree()) # Set extent.
@@ -68,6 +74,8 @@ plt.title(f"(b) ArH: {np.round(ratios_sorted[1], 1)}%",weight="bold") # Set titl
 
 ax3 = plt.subplot2grid(shape = (6,4), loc = (2,0), colspan = 2, rowspan = 2,projection=ccrs.PlateCarree(central_longitude = 255)) # Subplot format.
 cs = ax3.contourf(lons, lats, regime_composite[2], clevs_hgt, norm = norm_hgt, extend='both', transform=ccrs.PlateCarree(), cmap = my_cmap_hgt) # Contourf third regime.
+lines = ax3.contour(lons, lats, gaussian_filter(regime_composite_slp[2], sigma = 1.5), np.arange(992, 1036, 4), colors = 'purple', linewidths =1, transform=ccrs.PlateCarree()) # Contour SLP third regime.
+ax3.clabel(lines, fontsize = 3, inline_spacing = 1, colors = 'black')
 ax3.coastlines() # Add coastlines.
 ax3.add_feature(cfeature.BORDERS) # Add borders.
 ax3.set_extent([lon1, lon2, lat1, lat2], crs=ccrs.PlateCarree()) # Set extent.
@@ -75,6 +83,8 @@ plt.title(f"(c) PT: {np.round(ratios_sorted[2], 1)}%",weight="bold") # Set title
 
 ax4 = plt.subplot2grid(shape = (6,4), loc = (2,2), colspan = 2, rowspan = 2,projection=ccrs.PlateCarree(central_longitude = 255)) # Subplot format.
 cs = ax4.contourf(lons, lats, regime_composite[3], clevs_hgt, norm = norm_hgt, extend='both', transform=ccrs.PlateCarree(), cmap = my_cmap_hgt) # Contourf fourth regime.
+lines = ax4.contour(lons, lats, gaussian_filter(regime_composite_slp[3], sigma = 1.5), np.arange(992, 1036, 4), colors = 'purple', linewidths =1, transform=ccrs.PlateCarree()) # Contour SLP fourth regime.
+ax4.clabel(lines, fontsize = 3, inline_spacing = 1, colors = 'black')
 ax4.coastlines() # Add coastlines.
 ax4.add_feature(cfeature.BORDERS) # Add borders.
 ax4.set_extent([lon1, lon2, lat1, lat2], crs=ccrs.PlateCarree()) # Set extent.
@@ -82,6 +92,8 @@ plt.title(f"(d) WCR: {np.round(ratios_sorted[3],1)}%",weight="bold") # Set title
 
 ax5 = plt.subplot2grid(shape = (6,4), loc = (4,1), colspan = 2, rowspan = 2,projection=ccrs.PlateCarree(central_longitude = 255)) # Subplot format.
 cs = ax5.contourf(lons, lats, regime_composite[4], clevs_hgt, norm = norm_hgt, extend='both', transform=ccrs.PlateCarree(), cmap = my_cmap_hgt) # Contourf fifth regime.
+lines = ax5.contour(lons, lats, gaussian_filter(regime_composite_slp[4], sigma = 1.5), np.arange(992, 1036, 4), colors = 'purple', linewidths =1, transform=ccrs.PlateCarree()) # Contour SLP fifth regime.
+ax5.clabel(lines, fontsize = 3, inline_spacing = 1, colors = 'black')
 ax5.coastlines() # Add coastlines.
 ax5.add_feature(cfeature.BORDERS) # Add borders.
 ax5.set_extent([lon1, lon2, lat1, lat2], crs=ccrs.PlateCarree()) # Set extent.

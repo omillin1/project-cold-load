@@ -4,6 +4,8 @@ sys.path.insert(2, '/share/data1/Students/ollie/CAOs/project-cold-load')
 import numpy as np
 import os
 from tqdm import tqdm
+from datetime import datetime
+import holidays
 import matplotlib.pyplot as plt
 from utils import funcs
 
@@ -13,7 +15,6 @@ divs = ['KACY', 'WR', 'SPS', 'OKGE', 'CSWS', 'SECI', 'WFEC', 'EDE', 'NPPD', 'OPP
 year1, year2 = 1999, 2022
 
 ###### Get dates for time period ######
-
 dates_arr = funcs.read_early_load(div = 'OKGE', year1 = year1, month_bnd = [3, 11])[0] # 1999-2010 dates.
 dates_arr2 = funcs.read_late_load(2011, year2, months=['01', '02', '03', '04', '10', '11', '12'], month_bnd = [3, 11], div = 'OKGE')[0] # 2011-2022 dates.
 # Join the dates.
@@ -21,7 +22,6 @@ all_dates = np.concatenate((dates_arr, dates_arr2))
 
 
 ###### Loop through the regions and get the data ######
-
 data_region = [] # List to append the data for each region.
 for i in tqdm(range(len(divs))): # Loop through divisions
     load_early = funcs.read_early_load(div = divs[i], year1 = 1999, month_bnd = [3, 11])[1] # Get the 1999-2010 hourly load.
@@ -33,7 +33,6 @@ for i in tqdm(range(len(divs))): # Loop through divisions
 all_regions = np.stack(data_region)
 
 ###### Now for peak load ######
-
 # Reshape the load and dates into shape (div, days, 24 hours) and (days, 24 hours)
 load_reshape = all_regions.reshape(len(divs), int(all_regions.shape[1]/24), 24)
 date_reshape = all_dates.reshape(int(all_dates.shape[0]/24), 24)
@@ -46,7 +45,6 @@ peak_load = np.nanmax(sum_load, axis = 1)
 date_load = date_reshape[:, 0] # This is to get a date for each day on the record (midnight selected).
 
 ###### Scale by number of customers ######
-
 # Get a years, months, and days tracker.
 years_all = np.array([d.year for d in date_load])
 months_all = np.array([d.month for d in date_load])
@@ -129,7 +127,7 @@ plt.scatter(t2m_peak_load, anom_peak_load, color = 'black', s = 0.5) # Scatter t
 plt.plot(X_fit, Y_fit, color = 'red') # Plot the polynomial model.
 plt.axhline(y=0, lw = 2, color = 'blue', ls = '--')
 plt.xlabel("Temperature ($^\circ$C)", weight = 'bold', fontsize = 13) # Add xlabel.
-plt.ylabel("Peak Load Anomaly (MWh/1000 Customers)", weight = 'bold', fontsize = 12) # Add y label.
+plt.ylabel("Peak Load Anomaly (MW/1000 Customers)", weight = 'bold', fontsize = 12) # Add y label.
 plt.xticks(np.arange(-24, 30, 6)) # Add x ticks.
 plt.yticks(np.arange(-1.5, 3.5, 0.5)) # Add yticks.
 plt.xlim([-24, 24]) # Add x lim.
@@ -154,3 +152,91 @@ plt.text(-6, 2.5, f"Peak Load = {np.round(amin, 3)}T$^{2}$ {np.round(bmin, 3)}T 
 plt.title("b) Daily Min T2M", weight = 'bold', fontsize = 14) # Add title.
 plt.tight_layout() # Tight layout.
 plt.savefig("/share/data1/Students/ollie/CAOs/project-cold-load/Figures/Scatter/scatter_temp.png", bbox_inches = 'tight', dpi = 500) # Save figure.
+
+
+###### Get holiday days and weekend days ######
+# Get holiday dates to retrieve.
+my_list = [
+    "New Year's Day",
+    "Thanksgiving",
+    "Christmas Day",
+]
+
+# Set up list to store holidays in.
+holiday_list = []
+for i in range(len(year_cust)): # Loop through each year.
+    us_holidays = holidays.US(years=year_cust[i]) # Get a list of holidays for each year.
+    for j in range(len(my_list)): # Then loop through my list and retreieve only those holidays.
+        holiday_list.append(us_holidays.get_named(my_list[j])[0]) # Append holdiay dates to the holiday list.
+# Make the holiday list an array.
+holiday_arr = np.array(holiday_list)
+
+# Now find the day of the week of the holidays.
+hol_weekday_tracker = np.array([d.weekday() for d in holiday_arr]) # Monday is 0, Sunday is 6.
+
+# Now only get holidays that are not weekends (weekend days will be accounted for later).
+ind_hol_weekdays = np.where(hol_weekday_tracker <= 4)[0]
+
+# Now these are holiday days that are on weekdays, not weekends.
+final_hol_dates = holiday_arr[ind_hol_weekdays]
+
+# Get the inds in the date array where these dates lie.
+ind_holidays = np.array([np.where(date_load == datetime(d.year, d.month, d.day))[0][0] for d in final_hol_dates])
+
+# Now get the weekend dates.
+weekday_arr = np.array([d.weekday() for d in date_load]) # Monday is 0, Sunday is 6.
+
+# Find where the weekend days+holidays are and where the other weekdays are.
+weekend_hol_ind = np.array(sorted(np.concatenate((np.where(weekday_arr > 4)[0], ind_holidays)))) # These are the indices of weekends + weekday holidays.
+first_weekday_ind = np.where(weekday_arr <= 4)[0] # These are the indices of all weekdays.
+weekday_ind = np.array([i for i in first_weekday_ind if i not in ind_holidays]) # These are the indices of weekdays - weekday holidays.
+
+# Get just weekend data.
+t2m_weekend = t2m_peak_load[weekend_hol_ind]
+load_weekend = anom_peak_load[weekend_hol_ind]
+
+# Get just weekday data.
+t2m_weekday = t2m_peak_load[weekday_ind]
+load_weekday = anom_peak_load[weekday_ind]
+
+###### Polynomial Function for the weekend vs weekday data ######
+X_fit_weekend, Y_fit_weekend, a_weekend, b_weekend, c_weekend, eqn_weekend = funcs.plot_fit(t2m_weekend, load_weekend) # Fit a polynomial function for peak load-daily average T2M on weekends.
+X_fit_weekday, Y_fit_weekday, a_weekday, b_weekday, c_weekday, eqn_weekday = funcs.plot_fit(t2m_weekday, load_weekday) # Fit a polynomial function for peak load-daily min T2M on weekdays.
+
+###### Calculate coefficient of determination for each polynomial ######
+R2_weekend = funcs.rsquared(load_weekend, eqn_weekend(t2m_weekend))
+R2_weekday = funcs.rsquared(load_weekday, eqn_weekday(t2m_weekday))
+
+###### Recreate the figure for just weekend and holiday days and then weekdays ######
+# First, anomalous peak load against daily average T2M for weekdays
+fig = plt.figure(figsize = (10,5)) # Generate figure.
+ax = fig.add_subplot(1, 2, 1) # Add subplot.
+plt.scatter(t2m_weekday, load_weekday, color = 'black', s = 0.5) # Scatter the data.
+plt.plot(X_fit_weekday, Y_fit_weekday, color = 'red') # Plot the polynomial model.
+plt.axhline(y=0, lw = 2, color = 'blue', ls = '--')
+plt.xlabel("Temperature ($^\circ$C)", weight = 'bold', fontsize = 13) # Add xlabel.
+plt.ylabel("Peak Load Anomaly (MW/1000 Customers)", weight = 'bold', fontsize = 12) # Add y label.
+plt.xticks(np.arange(-24, 30, 6)) # Add x ticks.
+plt.yticks(np.arange(-1.5, 3.5, 0.5)) # Add yticks.
+plt.xlim([-24, 24]) # Add x lim.
+plt.ylim([-1.5, 3.0]) # Add y lim.
+plt.text(-18, -1, f"R$^{2}$ = {np.round(R2_weekday, 2)}") # Plot text with the R squared value.
+plt.text(-6, 2.5, f"Peak Load = {np.round(a_weekday, 3)}T$^{2}$ {np.round(b_weekday, 3)}T + {np.round(c_weekday, 3)}", fontsize = 9) # Plot the equation for the polynomial.
+plt.title("a) Daily Mean T2M (Weekdays)", weight = 'bold', fontsize = 13) # Add title.
+plt.tight_layout() # Tight layout.
+
+# Second, anomalous peak load against daily min T2M for weekends
+ax = fig.add_subplot(1, 2, 2) # Add subplot.
+plt.scatter(t2m_weekend, load_weekend, color = 'black', s = 0.5) # Scatter the data.
+plt.plot(X_fit_weekend, Y_fit_weekend, color = 'red') # Plot the polynomial model.
+plt.axhline(y=0, lw = 2, color = 'blue', ls = '--')
+plt.xlabel("Temperature ($^\circ$C)", weight = 'bold', fontsize = 13) # Add xlabel.
+plt.xticks(np.arange(-24, 30, 6)) # Add x ticks.
+plt.yticks(np.arange(-1.5, 3.5, 0.5)) # Add y ticks.
+plt.xlim([-24, 24]) # Add xlim.
+plt.ylim([-1.5, 3.0]) # Add ylim.
+plt.text(-18, -1, f"R$^{2}$ = {np.round(R2_weekend, 2)}") # Plot text with the R squared value.
+plt.text(-6, 2.5, f"Peak Load = {np.round(a_weekend, 3)}T$^{2}$ {np.round(b_weekend, 3)}T {np.round(c_weekend, 3)}", fontsize = 9) # Plot the equation for the polynomial.
+plt.title("b) Daily Mean T2M (Weekends+Holidays)", weight = 'bold', fontsize = 13) # Add title.
+plt.tight_layout() # Tight layout.
+plt.savefig("/share/data1/Students/ollie/CAOs/project-cold-load/Figures/Scatter/scatter_temp_weekday_weekend_hol.png", bbox_inches = 'tight', dpi = 500) # Save figure.

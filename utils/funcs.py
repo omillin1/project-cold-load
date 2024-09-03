@@ -27,16 +27,21 @@ def NormColorMap(cmap_select, my_bounds):
     my_cmap: The normalized colormap.
     norm: The normalization array.
     """
+    # Get selected cmap.
     cmap = cm.get_cmap(cmap_select)
+    # Set out the bounds.
     bounds = my_bounds
+    # Number of colors based on bounds.
     numColors = bounds.size - 1
+    # Set list to append colors.
     my_colors = []
+    # Loop through colors and append colors for custom cmap.
     for i in range(1,numColors+1):
         if (i != (numColors / 2.)):
             my_colors.append(cmap(i/float(numColors)))
         else:
             my_colors.extend(['white']*2)
-
+    # Make the cmap and norm from custom features.
     my_cmap = colors.ListedColormap(my_colors)
     my_cmap.set_under(cmap(0.0))
     my_cmap.set_over(cmap(1.0))
@@ -44,7 +49,7 @@ def NormColorMap(cmap_select, my_bounds):
 
     return my_cmap, norm
 
-def format_daily_ERA5(var = 'hgt', level = 500, lat_bounds = [90, 0], lon_bounds = [0, 359.5], year_bounds = [1996, 2014], months = ['11','12','01','02','03'], ndays = 151, isentropic = False):
+def format_daily_ERA5(var = 'hgt', level = 500, lat_bounds = [90, 0], lon_bounds = [0, 359.5], year_bounds = [1996, 2014], months = ['01','02','03','11','12'], ndays = 151, isentropic = False):
     '''
     Function to format 3D ERA5 daily data into (year, day in season, lat, lon) at a specific pressure level.
     This just makes it easier to subtract climatology.
@@ -346,8 +351,11 @@ def PlateCarreeMap(fig, subplot = [1, 1, 1], lon_bounds = [260, 330], lat_bounds
     -------
     ax1: matplotlib.pyplot.add_subplot feature, the object containing the map to subplot.
     '''
+    # Add subplot.
     ax1 = fig.add_subplot(subplot[0], subplot[1], subplot[2], projection=ccrs.PlateCarree(central_longitude = cen_lon)) # Generate the figure at the given subplot position.
+    # Set extent of map.
     ax1.set_extent([lon_bounds[0], lon_bounds[1], lat_bounds[0], lat_bounds[1]], crs=ccrs.PlateCarree()) # Set the extent of the map.
+    # Add coastlines and borders.
     ax1.coastlines() # Draw coastlines.
     ax1.add_feature(cfeature.BORDERS) # Add borders.
     return ax1
@@ -423,7 +431,7 @@ def read_early_load(div = 'OKGE', year1 = 1999, month_bnd = [3, 11]):
     region_arr = energy_frame['Region'].values
     load_arr = energy_frame['Load'].values
 
-    # We want just OKGE to start.
+    # Select the region.
     ind_region = np.where(region_arr == div)[0] # Get indices.
     # Restrict.
     year_region, month_region, day_region, hour_region = year_arr[ind_region], month_arr[ind_region], day_arr[ind_region], hour_arr[ind_region]
@@ -455,7 +463,7 @@ def read_early_load(div = 'OKGE', year1 = 1999, month_bnd = [3, 11]):
         coords=dict(
             time=dates_restr
         ),
-        attrs=dict(description=f"Load (MWh) for {div}"),
+        attrs=dict(description=f"Load (MW) for {div}"),
     )
 
     # Sort by time.
@@ -568,7 +576,7 @@ def read_late_load(year1, year2, months=['01', '02', '03', '04', '10', '11', '12
         coords=dict(
             time=date_array
         ),
-        attrs=dict(description=f"Load (MWh) for {div}"),
+        attrs=dict(description=f"Load (MW) for {div}"),
     )
     # Now retrieve only data for months that you want to keep.
     grouped_ds = ds.sel(time=is_months(ds['time.month'], month_bnd=month_bnd))
@@ -632,13 +640,13 @@ def subcategorybar(X, vals, errors, error_col, width=0.8, bt = 1, capsize = 10, 
     capsize: float or integer, the size of the errorbar caps.
     colors: list of strings, should be the size of the number of bars (size of vals).
     """
-    n = len(vals)
-    colors = colors
+    n = len(vals) # n is number of bars.
+    colors = colors # colors is list of colors for bars.
     _X = np.arange(len(X))
-    for i in range(n):
+    for i in range(n): # Loop through each bar and plot.
         plt.bar(_X - width/2. + i/float(n)*width, vals[i]-bt, bottom = bt, 
                 width=width/float(n), align="edge", color = colors[i], edgecolor = 'black', yerr = errors[i], ecolor = error_col, capsize = capsize)   
-    plt.xticks(_X, X)
+    plt.xticks(_X, X) # x-ticks.
 
 def plot_fit(X, Y):
     """Fits a second degree polynomial between two datasets.

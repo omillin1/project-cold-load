@@ -8,7 +8,6 @@ from sklearn.decomposition import PCA
 from tqdm import tqdm
 from utils import funcs
 import pandas as pd
-import pickle
 import xarray as xr
 
 from argparse import ArgumentParser
@@ -20,7 +19,6 @@ parser.add_argument('-c','--clim',nargs=2,type=int,help='Climo bounds',default=[
 args = parser.parse_args()
 
 ###### Read in the data ######
-
 # Set bounds for lat and lon.
 lat1, lat2 = 80, 20
 lon1, lon2 = 180, 330
@@ -29,6 +27,8 @@ lon1, lon2 = 180, 330
 hgt_data, time, latitude, longitude = funcs.format_daily_ERA5(var = 'hgt', level = 500, lat_bounds = [lat1, lat2], lon_bounds = [lon1, lon2], year_bounds = [args.years[0], args.years[1]], months = ['01','02','03','11','12'], ndays = 151, isentropic = False)
 # Read in T2M data.
 t2m_data = funcs.format_daily_ERA5(var = 't2m', level = None, lat_bounds = [lat1, lat2], lon_bounds = [lon1, lon2], year_bounds = [args.years[0], args.years[1]], months = ['01','02','03','11','12'], ndays = 151, isentropic = False)[0]
+# Read in SLP data.
+slp_data = funcs.format_daily_ERA5(var = 'slp', level = None, lat_bounds = [lat1, lat2], lon_bounds = [lon1, lon2], year_bounds = [args.years[0], args.years[1]], months = ['01','02','03','11','12'], ndays = 151, isentropic = False)[0]
 
 ###### Anomalies ######
 # Set year array for data.
@@ -43,11 +43,13 @@ climo_t2m = np.nanmean(t2m_data[year_ind1:year_ind2+1], axis = 0)
 anom = hgt_data - climo
 anom_t2m = t2m_data - climo_t2m
 
-###### Joining, flattening and detrending ######
+###### Reshaping ######
 # Flatten hgt to get (days, lat, lon)
 flat_anom = anom.reshape(anom.shape[0]*anom.shape[1], anom.shape[2], anom.shape[3])
 # Flatten T2M to get (days, lat, lon)
 flat_anom_t2m = anom_t2m.reshape(anom_t2m.shape[0]*anom_t2m.shape[1], anom_t2m.shape[2], anom_t2m.shape[3])
+# Flatten SLP to get (days, lat, lon)
+flat_slp = slp_data.reshape(slp_data.shape[0]*slp_data.shape[1], slp_data.shape[2], slp_data.shape[3])
 # Flatten time to get (days,)
 flat_time = time.reshape(time.shape[0]*time.shape[1])
 
@@ -69,7 +71,7 @@ for i in tqdm(range(ltm_dates.shape[0])):
     detrended_gph[time_ind, :, :] = (funcs.LinearDetrend(flat_anom[time_ind, :, :].reshape(T, J*I))[0]).reshape(T, J, I) # Detrend hgt by calendar day, reshape and store back in the empty array.
     detrended_t2m[time_ind, :, :] = (funcs.LinearDetrend(flat_anom_t2m[time_ind, :, :].reshape(T, J*I))[0]).reshape(T, J, I) # Detrend T2M by calendar day, reshape and store back in the empty array.
 
-###### Clustering ######
+###### PCA and Clustering ######
 # Multiply by square-root cosine weights
 weights = np.sqrt(np.cos(np.radians(latitude)))
 z500_anom_sc = detrended_gph*weights[:,np.newaxis]
@@ -89,13 +91,6 @@ n_eof=12
 print("n_eofs",n_eof)
 pca = PCA(n_components=n_eof).fit(z500_anom_flat)
 
-# If you want to save the solver object for projection, use the below but the projection must be the same grid.
-'''solver = Eof(detrended_gph, weights = weights[:, np.newaxis])
-
-# Save EOF object.
-pickle.dump(solver, open(YOURSAVEDIR/eof_object.pkl", "wb"))'''
-
-
 # get the principal component timeseries, non-standardised
 pc_ts = pca.transform(z500_anom_flat)
 
@@ -104,12 +99,7 @@ ncluster = 5
 print ("Begin K-means clustering...")
 print (ncluster, "clusters")
 ## Do kmeans clustering.
-kmeans = KMeans(n_clusters=ncluster, n_init=100, max_iter=500).fit(pc_ts)
-
-# If you want to save the kmeans object for projection, use the below.
-'''# Save the k-means object.
-pickle.dump(kmeans, open("YOURSAVEDIR/kmeans_object.pkl", "wb"))'''
-
+kmeans = KMeans(n_clusters=ncluster, n_init=500, max_iter=500,random_state=42).fit(pc_ts)
 
 # fit a regime to each day
 model_clust = kmeans.predict(pc_ts)
@@ -136,7 +126,7 @@ for i in range(ncluster):
 model_clust=new_clust
 
 ###### Save the regimes in a txt file here ######
-'''# Change the numbers of regimes into the string name. Define list to append to.
+# Change the numbers of regimes into the string name. Define list to append to.
 regime_list = []
 for i in range(len(model_clust)):
     if model_clust[i] == 0.0:
@@ -155,18 +145,20 @@ regime_array = np.array(regime_list)
 ## Save the timeseries using pandas
 weather_types = pd.Series(regime_array, index=flat_time)
 cluster_df = pd.Series.to_frame(weather_types)
-cluster_df.to_csv(f'/share/data1/Students/ollie/CAOs/Data/Energy/Regimes/detrended_regimes_{args.years[0]}_{args.years[1]}_NDJFM.txt', sep=' ', index=True)'''
+cluster_df.to_csv(f'/share/data1/Students/ollie/CAOs/Data/Energy/Regimes/detrended_regimes_{args.years[0]}_{args.years[1]}_NDJFM.txt', sep=' ', index=True)
 
 
 ###### Get composite Z500 and T2M anomalies in each regime ######
 # Empty arrays to store the 5 composite patterns.
 regime_composite = np.zeros((5,detrended_gph.shape[1],detrended_gph.shape[2]))
 regime_composite_t2m = np.zeros((5,detrended_t2m.shape[1],detrended_t2m.shape[2]))
+regime_composite_slp = np.zeros((5,flat_slp.shape[1],flat_slp.shape[2]))
 # Loop through each regime and make a composite of each day in that regime.
 for r in range(5):
     subset = np.where(model_clust == r)[0]
     regime_composite[r] = np.nanmean(detrended_gph[subset],axis=0)/10 # For dam
     regime_composite_t2m[r] = np.nanmean(detrended_t2m[subset], axis=0)
+    regime_composite_slp[r] = np.nanmean(flat_slp[subset], axis=0)/100 # For hPa.
 
 
 ###### Save the composite maps/ratios for plotting in separate environment with geopandas ######
@@ -174,6 +166,7 @@ for r in range(5):
 ds = xr.Dataset(
     data_vars=dict(
         t2m=(["regime","lat","lon"], regime_composite_t2m),
+        slp=(["regime","lat","lon"], regime_composite_slp),
         hgt =(["regime","lat","lon"], regime_composite),
         ratio=(["regime"], ratios_sorted)
     ),
