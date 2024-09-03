@@ -224,6 +224,14 @@ mean_wcr = np.nanmean(wcr_load)
 mean_arl = np.nanmean(arl_load)
 mean_pt = np.nanmean(pt_load)
 
+###### Get the standard deviation for each regime ######
+std_akr = np.nanstd(akr_load)
+std_arh = np.nanstd(arh_load)
+std_wcr = np.nanstd(wcr_load)
+std_arl = np.nanstd(arl_load)
+std_pt = np.nanstd(pt_load)
+std_all = np.nanstd(anom_peak_load)
+
 ###### Bootstrap for the mean values ######
 # Set up empty arrays to store bootstrapped data.
 akr_mean_boot = np.zeros((n_samples)) # AkR.
@@ -332,39 +340,42 @@ all_pdf = np.exp(all_kde.score_samples(points[:, None]))
 
 
 ###### PLOT THE FIGURES ######
-fig = plt.figure(figsize=(12.5, 10)) # Set up figure.
+fig = plt.figure(figsize=(15, 12.5)) # Set up figure.
 
-# Plot the PDFs for each regime.
-ax1 = plt.subplot2grid(shape = (4,4), loc = (0,0), colspan = 2, rowspan = 2) # Subplot.
-ax1.plot(points, akr_pdf, color = 'darkorange', lw = 2, label = f'AkR: $\u03B1$={np.round(akr_skew, 2)}, $\u03B2$={np.round(akr_kur, 2)}') # Plot AkR.
-ax1.plot(points, arh_pdf, color = 'darkred', lw = 2, label = f'ArH: $\u03B1$={np.round(arh_skew, 2)}, $\u03B2$={np.round(arh_kur, 2)}') # Plot ArH.
-ax1.plot(points, pt_pdf, color = 'darkgreen', lw = 2, label = f'PT: $\u03B1$={np.round(pt_skew, 2)}, $\u03B2$={np.round(pt_kur, 2)}') # Plot PT.
-ax1.plot(points, wcr_pdf, color = 'darkblue', lw = 2, label = f'WCR: $\u03B1$={np.round(wcr_skew, 2)}, $\u03B2$={np.round(wcr_kur, 2)}') # Plot WCR.
-ax1.plot(points, arl_pdf, color = 'purple', lw = 2, label = f'ArL: $\u03B1$={np.round(arl_skew, 2)}, $\u03B2$={np.round(arl_kur, 2)}') # Plot ArL.
-ax1.plot(points, all_pdf, color = 'black', lw = 2, label = f'All: $\u03B1$={np.round(all_skew, 2)}, $\u03B2$={np.round(all_kur, 2)}') # Plot ALL.
-plt.axvline(x = 0, color = 'black', lw = 2, ls = '--') # Vertical dashed line for 0 line.
-ax1.set_xticks(np.arange(-5, 6, 1)) # Set xticks.
-ax1.set_yticks(np.arange(0, 1.2, 0.2)) # Set yticks.
-ax1.set_xlim([-2, 2]) # Set x-lim.
-ax1.set_ylim([0, 1]) # Set y-lim.
-ax1.set_xlabel('Peak Load Anomaly (MWh/1000 Cust)', fontsize = 13) # Set x label.
-ax1.set_ylabel('Probability Density', fontsize = 13) # Set y label.
-ax1.set_title('a) Probability Density Function', weight = 'bold', fontsize = 14) # Set title.
-ax1.legend() # Set legend.
 
 # Plot the mean loads by regime.
-ax2 = plt.subplot2grid(shape = (4,4), loc = (0,2), colspan = 2, rowspan = 2) # Subplot.
+ax1 = plt.subplot2grid(shape = (4,4), loc = (0,0), colspan = 2, rowspan = 2) # Subplot.
 reg_labs = ['AkR', 'ArH', 'WCR', 'PT', 'ArL'] # Labels for the regimes.
 mean_anoms = [mean_akr, mean_arh, mean_wcr, mean_pt, mean_arl] # Mean anomalies for the bar plot for each regime.
-ax2.bar(reg_labs, mean_anoms, color = ['darkorange', 'darkred', 'darkblue', 'darkgreen', 'purple'], edgecolor = 'black', label = reg_labs) # Barplot.
-ax2.plot(reg_labs, plot_sig, marker="D", linestyle="", alpha=1, color="white", markeredgecolor = 'black') # Plot the dots for significance.
-ax2.set_xlabel("Regime", fontsize = 13) # Set x label.
-ax2.set_ylabel('Peak Load Anomaly (MWh/1000 Cust)', fontsize = 13) # Set y label.
-ax2.set_title("b) Composite Peak Load Anomaly", weight = 'bold', fontsize = 14) # Set the title.
-ax2.set_yticks(np.arange(-0.2, 0.25, 0.05)) # Set y ticks.
-ax2.set_ylim([-0.2, 0.2]) # Set y lim.
-ax2.set_xticklabels(reg_labs, rotation=45, fontsize = 10) # Plot the xtick labels.
+ax1.bar(reg_labs, mean_anoms, color = ['darkorange', 'darkred', 'darkblue', 'darkgreen', 'purple'], edgecolor = 'black', label = reg_labs) # Barplot.
+ax1.plot(reg_labs, plot_sig, marker="D", linestyle="", alpha=1, color="white", markeredgecolor = 'black') # Plot the dots for significance.
+ax1.set_xlabel("Regime", fontsize = 15) # Set x label.
+ax1.set_ylabel('Peak Load Anomaly (MW/1000 Cust)', fontsize = 15) # Set y label.
+ax1.set_title("a) Composite Peak Load Anomaly", weight = 'bold', fontsize = 16) # Set the title.
+ax1.set_yticks(np.arange(-0.2, 0.25, 0.05)) # Set y ticks.
+ax1.set_ylim([-0.2, 0.2]) # Set y lim.
+ax1.set_xticklabels(reg_labs, rotation=45, fontsize = 12) # Plot the xtick labels.
 plt.axhline(y=0, lw = 1, ls = '-', color = 'black') # Horizontal line for 0 line.
+ax1.legend() # Set legend.
+
+# Plot the PDFs for each regime.
+ax2 = plt.subplot2grid(shape = (4,4), loc = (0,2), colspan = 2, rowspan = 2) # Subplot.
+ax2.plot(points, akr_pdf, color = 'darkorange', lw = 2, label = f'AkR: $\u03C3$={np.round(std_akr, 2)}, $\u03B1$={np.round(akr_skew, 2)}, $\u03B2$={np.round(akr_kur, 2)}') # Plot AkR.
+ax2.plot(points, arh_pdf, color = 'darkred', lw = 2, label = f'ArH: $\u03C3$={np.round(std_arh, 2)}, $\u03B1$={np.round(arh_skew, 2)}, $\u03B2$={np.round(arh_kur, 2)}') # Plot ArH.
+ax2.plot(points, pt_pdf, color = 'darkgreen', lw = 2, label = f'PT: $\u03C3$={np.round(std_pt, 2)}, $\u03B1$={np.round(pt_skew, 2)}, $\u03B2$={np.round(pt_kur, 2)}') # Plot PT.
+ax2.plot(points, wcr_pdf, color = 'darkblue', lw = 2, label = f'WCR: $\u03C3$={np.round(std_wcr, 2)}, $\u03B1$={np.round(wcr_skew, 2)}, $\u03B2$={np.round(wcr_kur, 2)}') # Plot WCR.
+ax2.plot(points, arl_pdf, color = 'purple', lw = 2, label = f'ArL: $\u03C3$={np.round(std_arl, 2)}, $\u03B1$={np.round(arl_skew, 2)}, $\u03B2$={np.round(arl_kur, 2)}') # Plot ArL.
+ax2.plot(points, all_pdf, color = 'black', lw = 2, label = f'All: $\u03C3$={np.round(std_all, 2)}, $\u03B1$={np.round(all_skew, 2)}, $\u03B2$={np.round(all_kur, 2)}') # Plot ALL.
+plt.axvline(x = 0, color = 'black', lw = 2, ls = '--') # Vertical dashed line for 0 line.
+ax2.set_xticks(np.arange(-5, 6, 1)) # Set xticks.
+ax2.set_yticks(np.arange(0, 1.2, 0.2)) # Set yticks.
+ax2.xaxis.set_tick_params(labelsize=12)
+ax2.yaxis.set_tick_params(labelsize=12)
+ax2.set_xlim([-2, 2]) # Set x-lim.
+ax2.set_ylim([0, 1]) # Set y-lim.
+ax2.set_xlabel('Peak Load Anomaly (MW/1000 Cust)', fontsize = 15) # Set x label.
+ax2.set_ylabel('Probability Density', fontsize = 15) # Set y label.
+ax2.set_title('b) Probability Density Function', weight = 'bold', fontsize = 16) # Set title.
 ax2.legend() # Set legend.
 
 # Plot the risk ratios.
@@ -373,12 +384,12 @@ X = np.arange(1, 4, 1) # Get x tick numbers.
 labels = [f'{int(perc_arr[0])}th',f'{int(perc_arr[1])}th', f'{perc_arr[2]}th'] # Set out labels of percentiles.
 bottom = 1 # Set bottom value for risk ratio plot.
 reg_bar = funcs.subcategorybar(X, [akr_rr,arh_rr,wcr_rr,pt_rr,arl_rr], [np.absolute(akr_bars), np.absolute(arh_bars), np.absolute(wcr_bars), np.absolute(pt_bars), np.absolute(arl_bars)], error_col = 'gray',  bt = bottom, colors = ['darkorange', 'darkred', 'darkblue', 'darkgreen', 'purple'], capsize = 10) # Plot the bars.
-ax3.set_xticklabels(labels, rotation=45, fontsize = 10) # Plot the xtick labels.
+ax3.set_xticklabels(labels, rotation=45, fontsize = 12) # Plot the xtick labels.
 ax3.set_yticks(np.arange(0, 3, 0.5)) # Plot the y ticks.
 ax3.set_ylim([0, 2.5]) # Set the y limit.
-ax3.set_ylabel("Risk Ratio", fontsize = 13) # Plot the y label.
-ax3.set_xlabel("Percentile", fontsize = 13) # Plot the x label.
-ax3.set_title("c) Extreme Peak Load Risk Ratios", weight = 'bold', fontsize = 14) # Set the title.
+ax3.set_ylabel("Risk Ratio", fontsize = 15) # Plot the y label.
+ax3.set_xlabel("Percentile", fontsize = 15) # Plot the x label.
+ax3.set_title("c) Extreme Peak Load Risk Ratios", weight = 'bold', fontsize = 16) # Set the title.
 ax3.legend(reg_labs) # Put a legend.
 plt.axhline(y=1, lw = 1, ls = '-', color = 'black') # Horizontal line for the 1 risk ratio value.
 fig.tight_layout() # Tight layout.
