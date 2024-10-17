@@ -11,13 +11,14 @@ from shapely.geometry import shape, Point
 import geopandas as gpd
 from utils import funcs
 
-###### Set up regions to retrieve and years to use ######
-divs = ['KACY', 'WR', 'SPS', 'OKGE', 'CSWS', 'SECI', 'WFEC', 'EDE', 'NPPD', 'OPPD', 'KCPL', 'MPS']
-year1, year2 = 1999, 2022
+###### Set up balancing authorities to retrieve and years to use ######
+divs = ['KACY', 'WR', 'SPS', 'OKGE', 'CSWS', 'SECI', 'WFEC', 'EDE', 'NPPD', 'OPPD', 'KCPL', 'MPS'] # Our 13 balancing authorities (12 here but KCPL is merged with INDN in the functions).
+year1, year2 = 1999, 2022 # Years to choose.
 
 ###### Get dates for time period ######
 dates_arr = funcs.read_early_load(div = 'OKGE', year1 = year1, month_bnd = [3, 11])[0] # 1999-2010 dates.
 dates_arr2 = funcs.read_late_load(2011, year2, months=['01', '02', '03', '04', '10', '11', '12'], month_bnd = [3, 11], div = 'OKGE')[0] # 2011-2022 dates.
+
 # Join the dates.
 all_dates = np.concatenate((dates_arr, dates_arr2))
 
@@ -30,7 +31,7 @@ for i in tqdm(range(len(divs))): # Loop through divisions
     load_comb = np.concatenate((load_early, load_late)) # Join the loads for the two periods.
     data_region.append(load_comb) # Append the joined load to the empty list.
 
-# Now vstack, to get an array of shape (region, time).
+# Now stack, to get an array of shape (region, time).
 all_regions = np.stack(data_region)
 
 ###### Now for peak load ######
@@ -56,14 +57,13 @@ dates_select = date_load[np.where(years_all == 2012)[0]]
 # Now read number of customers by division.
 cust_region = [] # Empty list to store customer numbers.
 for i in tqdm(range(len(divs))): # Loop through divisions.
-    year_cust, data_cust = funcs.read_cust_data(div = divs[i], year1 = year1, year2 = year2, param = 'Customers') # Get the customer number data
-
+    year_cust, data_cust = funcs.read_cust_data(div = divs[i], year1 = year1, year2 = year2, param = 'Customers') # Get the customer number data.
     cust_region.append(data_cust) # Append customer number by year to the empty list.
 
-# Now vstack to get shape (regions, year).
+# Now stack to get shape (regions, year).
 all_cust = np.stack(cust_region)/1000 # For thousands of customers.
 
-# Sum for all customers by region. Will give shape (year,)
+# Sum customers across region. Will give shape (year,).
 sum_cust = np.nansum(all_cust, axis = 0)
 
 # Now go through and scale the peak load by number of customers.
@@ -97,7 +97,7 @@ ltm = np.nanmean(era5_t2m[np.where(years_arr == climo_year1)[0][0]:np.where(year
 anom = era5_t2m - ltm
 
 # Reshape T2M daily average data and dates to (days,) in the first dimension.
-t2m_reshape = anom.reshape(anom.shape[0]*anom.shape[1], anom.shape[2], anom.shape[3]) # For degrees C.
+t2m_reshape = anom.reshape(anom.shape[0]*anom.shape[1], anom.shape[2], anom.shape[3])
 t2m_time_reshape = era5_time.reshape(era5_time.shape[0]*era5_time.shape[1])
 
 ###### Now get corresponding T2M data for each peak load day ######
@@ -278,7 +278,7 @@ ax6.set_extent([upd_lon1, upd_lon2, upd_lat1, upd_lat2], crs=ccrs.PlateCarree())
 plt.title(f"(f) All (n = {ind_all.size})",weight="bold", fontsize = 15) # Set title.
 plt.tight_layout() # Tight layout.
 
-# Set uo colorbar.
+# Set up colorbar.
 cb_ax = fig.add_axes([0.05, -0.02, 0.91, 0.04]) # Axes for colorbar.
 cbar = fig.colorbar(cs, cax=cb_ax,orientation="horizontal",ticks=np.arange(-10, 12, 2),extend="both",spacing='proportional') # Plot colorbar.
 cbar.set_label("2m Temperature Anomaly ($^\circ$C)", fontsize = 14) # Colorbar label.

@@ -10,13 +10,14 @@ import cartopy.feature as cfeature
 from shapely.geometry import shape, Point
 from utils import funcs
 
-###### Set up regions to retrieve and years to use ######
-divs = ['KACY', 'WR', 'SPS', 'OKGE', 'CSWS', 'SECI', 'WFEC', 'EDE', 'NPPD', 'OPPD', 'KCPL', 'MPS']
-year1, year2 = 1999, 2022
+###### Set up balancing authorities to retrieve and years to use ######
+divs = ['KACY', 'WR', 'SPS', 'OKGE', 'CSWS', 'SECI', 'WFEC', 'EDE', 'NPPD', 'OPPD', 'KCPL', 'MPS'] # Our 13 balancing authorities (12 here but KCPL is merged with INDN in the functions).
+year1, year2 = 1999, 2022 # Years to choose.
 
 ###### Get dates for time period ######
 dates_arr = funcs.read_early_load(div = 'OKGE', year1 = year1, month_bnd = [3, 11])[0] # 1999-2010 dates.
 dates_arr2 = funcs.read_late_load(2011, year2, months=['01', '02', '03', '04', '10', '11', '12'], month_bnd = [3, 11], div = 'OKGE')[0] # 2011-2022 dates.
+
 # Join the dates.
 all_dates = np.concatenate((dates_arr, dates_arr2))
 
@@ -29,7 +30,7 @@ for i in tqdm(range(len(divs))): # Loop through divisions
     load_comb = np.concatenate((load_early, load_late)) # Join the loads for the two periods.
     data_region.append(load_comb) # Append the joined load to the empty list.
 
-# Now vstack, to get an array of shape (region, time).
+# Now stack, to get an array of shape (region, time).
 all_regions = np.stack(data_region)
 
 ###### Now for peak load ######
@@ -55,14 +56,13 @@ dates_select = date_load[np.where(years_all == 2012)[0]]
 # Now read number of customers by division.
 cust_region = [] # Empty list to store customer numbers.
 for i in tqdm(range(len(divs))): # Loop through divisions.
-    year_cust, data_cust = funcs.read_cust_data(div = divs[i], year1 = year1, year2 = year2, param = 'Customers') # Get the customer number data
-
+    year_cust, data_cust = funcs.read_cust_data(div = divs[i], year1 = year1, year2 = year2, param = 'Customers') # Get the customer number data.
     cust_region.append(data_cust) # Append customer number by year to the empty list.
 
-# Now vstack to get shape (regions, year).
+# Now stack to get shape (regions, year).
 all_cust = np.stack(cust_region)/1000 # For thousands of customers.
 
-# Sum for all customers by region. Will give shape (year,)
+# Sum customers across region. Will give shape (year,).
 sum_cust = np.nansum(all_cust, axis = 0)
 
 # Now go through and scale the peak load by number of customers.
@@ -78,7 +78,7 @@ for i in tqdm(range(dates_select.shape[0])): # Loop through each calendar day.
     mean = np.nanmean(norm_peak_load[time_ind]) # Take the mean of those data points across the whole time series.
     anom_peak_load[time_ind] = (norm_peak_load[time_ind]-mean) # Now take the scaled peak load for a given calendar day, subtract the mean, and store it in the right indices.
 
-###### Read in the ERA5 T2M data ######
+###### Read in the ERA5 T2M and 500 hPa GPH data ######
 # Lat and lons for the T2M area.
 lat1, lat2 = 80, 20
 lon1, lon2 = 180, 330
@@ -106,7 +106,7 @@ t2m_reshape = anom_t2m.reshape(anom_t2m.shape[0]*anom_t2m.shape[1], anom_t2m.sha
 hgt_reshape = anom_hgt.reshape(anom_hgt.shape[0]*anom_hgt.shape[1], anom_hgt.shape[2], anom_hgt.shape[3])
 t2m_time_reshape = era5_time.reshape(era5_time.shape[0]*era5_time.shape[1])
 
-###### Now get corresponding T2M data for each peak load day ######
+###### Now get corresponding T2M and 500 hPa GPH data for each peak load day ######
 t2m_peak_load = np.zeros((anom_peak_load.shape[0], era5_lat.shape[0], era5_lon.shape[0])) # Array to store daily average T2M for peak load dates.
 hgt_peak_load = np.zeros((anom_peak_load.shape[0], era5_lat.shape[0], era5_lon.shape[0])) # Array to store daily average hgt for peak load dates.
 for i in range(len(anom_peak_load)): # Loop through the shape of peak load dates.
@@ -129,7 +129,7 @@ for i in range(len(date_load)): # Loop through each date in the peak loads.
     ind = np.where(dates_regime == date_load[i])[0][0] # Find the index where the regime dates equals the chosen peak load date.
     regime_peak_load_list.append(regimes[ind]) # Append the regime to the regime list.
 # Make the list of regimes for peak load days into an array.
-regimes_peak_load = np.asarray(regime_peak_load_list)
+regimes_peak_load = np.array(regime_peak_load_list)
 
 ###### Now get composites of extreme demand days ######
 selected_perc = [90, 95, 97.5]

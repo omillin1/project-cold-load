@@ -10,13 +10,13 @@ import matplotlib.pyplot as plt
 from utils import funcs
 
 ###### Set up balancing authorities to retrieve and years to use ######
-
-divs = ['KACY', 'WR', 'SPS', 'OKGE', 'CSWS', 'SECI', 'WFEC', 'EDE', 'NPPD', 'OPPD', 'KCPL', 'MPS']
-year1, year2 = 1999, 2022
+divs = ['KACY', 'WR', 'SPS', 'OKGE', 'CSWS', 'SECI', 'WFEC', 'EDE', 'NPPD', 'OPPD', 'KCPL', 'MPS'] # Our 13 balancing authorities (12 here but KCPL is merged with INDN in the functions).
+year1, year2 = 1999, 2022 # Years to choose.
 
 ###### Get dates for time period ######
 dates_arr = funcs.read_early_load(div = 'OKGE', year1 = year1, month_bnd = [3, 11])[0] # 1999-2010 dates.
 dates_arr2 = funcs.read_late_load(2011, year2, months=['01', '02', '03', '04', '10', '11', '12'], month_bnd = [3, 11], div = 'OKGE')[0] # 2011-2022 dates.
+
 # Join the dates.
 all_dates = np.concatenate((dates_arr, dates_arr2))
 
@@ -29,7 +29,7 @@ for i in tqdm(range(len(divs))): # Loop through divisions
     load_comb = np.concatenate((load_early, load_late)) # Join the loads for the two periods.
     data_region.append(load_comb) # Append the joined load to the empty list.
 
-# Now vstack, to get an array of shape (region, time).
+# Now stack, to get an array of shape (region, time).
 all_regions = np.stack(data_region)
 
 ###### Now for peak load ######
@@ -55,14 +55,13 @@ dates_select = date_load[np.where(years_all == 2012)[0]]
 # Now read number of customers by division.
 cust_region = [] # Empty list to store customer numbers.
 for i in tqdm(range(len(divs))): # Loop through divisions.
-    year_cust, data_cust = funcs.read_cust_data(div = divs[i], year1 = year1, year2 = year2, param = 'Customers') # Get the customer number data
-
+    year_cust, data_cust = funcs.read_cust_data(div = divs[i], year1 = year1, year2 = year2, param = 'Customers') # Get the customer number data.
     cust_region.append(data_cust) # Append customer number by year to the empty list.
 
 # Now stack to get shape (regions, year).
 all_cust = np.stack(cust_region)/1000 # For thousands of customers.
 
-# Sum customers across region. Will give shape (year,)
+# Sum customers across region. Will give shape (year,).
 sum_cust = np.nansum(all_cust, axis = 0)
 
 # Now go through and scale the peak load by number of customers.
@@ -84,7 +83,7 @@ lat1, lat2 = 43, 31
 lon1, lon2 = 256, 268
 # Min 2m temperature.
 era5_tmin, era5_time, era5_lat, era5_lon = funcs.minmax_2d_ERA5(var = 'Tmin', lat_bounds = [lat1, lat2], lon_bounds = [lon1, lon2], year_bounds = [year1, year2], months = ['01', '02', '03', '11', '12'], ndays = 151)
-# Daily average 2 m temperature.
+# Daily average 2m temperature.
 era5_t2m = funcs.format_daily_ERA5(var = 't2m', level = None, lat_bounds = [lat1, lat2], lon_bounds = [lon1, lon2], year_bounds = [year1, year2], months = ['01', '02', '03', '11', '12'], ndays = 151, isentropic = False)[0]
 
 # Latitude average the temperature data.
@@ -96,11 +95,10 @@ lat_ave_tmin = np.average(era5_tmin, weights = weights, axis = 2) # Latitude wei
 area_ave_t2m = np.nanmean(lat_ave_t2m, axis = -1) # Daily average T2M.
 area_ave_tmin = np.nanmean(lat_ave_tmin, axis = -1) # Daily min T2M.
 
-# Reshape T2M daily average data to (days,).
+# Reshape T2M daily average and min data to (days,).
 t2m_reshape = area_ave_t2m.reshape(area_ave_t2m.shape[0]*area_ave_t2m.shape[1])-273.15 # For degrees C.
-t2m_time_reshape = era5_time.reshape(era5_time.shape[0]*era5_time.shape[1])
-# Reshape T2M min data to (days,).
 tmin_reshape = area_ave_tmin.reshape(area_ave_tmin.shape[0]*area_ave_tmin.shape[1])-273.15 # For degrees C.
+t2m_time_reshape = era5_time.reshape(era5_time.shape[0]*era5_time.shape[1])
 
 ###### Now get corresponding T2M data for each peak load day ######
 t2m_peak_load = np.zeros((anom_peak_load.shape)) # Array to store daily average T2M for peak load dates.
@@ -116,12 +114,13 @@ X_fit, Y_fit, a, b, c, eqn_t2m = funcs.plot_fit(t2m_peak_load, anom_peak_load) #
 X_fit_tmin, Y_fit_tmin, amin, bmin, cmin, eqn_tmin = funcs.plot_fit(tmin_peak_load, anom_peak_load) # Fit a polynomial function for peak load-daily min T2M.
 
 ###### Calculate coefficient of determination for each polynomial ######
-R2_t2m = funcs.rsquared(anom_peak_load, eqn_t2m(t2m_peak_load))
-R2_tmin = funcs.rsquared(anom_peak_load, eqn_tmin(tmin_peak_load))
+R2_t2m = funcs.rsquared(anom_peak_load, eqn_t2m(t2m_peak_load)) # R2 for daily mean T2M.
+R2_tmin = funcs.rsquared(anom_peak_load, eqn_tmin(tmin_peak_load)) # R2 for daily min T2M.
 
 ###### Plot scatter plots for each model ######
-# First, anomalous peak load against daily average T2M ######
 fig = plt.figure(figsize = (10,5)) # Generate figure.
+
+# First, anomalous peak load against daily average T2M.
 ax = fig.add_subplot(1, 2, 1) # Add subplot.
 plt.scatter(t2m_peak_load, anom_peak_load, color = 'black', s = 0.5) # Scatter the data.
 plt.plot(X_fit, Y_fit, color = 'red') # Plot the polynomial model.
@@ -180,7 +179,7 @@ ind_hol_weekdays = np.where(hol_weekday_tracker <= 4)[0]
 # Now these are holiday days that are on weekdays, not weekends.
 final_hol_dates = holiday_arr[ind_hol_weekdays]
 
-# Get the inds in the date array where these dates lie.
+# Get the inds in the date array where these weekday holiday dates lie.
 ind_holidays = np.array([np.where(date_load == datetime(d.year, d.month, d.day))[0][0] for d in final_hol_dates])
 
 # Now get the weekend dates.
@@ -204,10 +203,10 @@ X_fit_weekend, Y_fit_weekend, a_weekend, b_weekend, c_weekend, eqn_weekend = fun
 X_fit_weekday, Y_fit_weekday, a_weekday, b_weekday, c_weekday, eqn_weekday = funcs.plot_fit(t2m_weekday, load_weekday) # Fit a polynomial function for peak load-daily min T2M on weekdays.
 
 ###### Calculate coefficient of determination for each polynomial ######
-R2_weekend = funcs.rsquared(load_weekend, eqn_weekend(t2m_weekend))
-R2_weekday = funcs.rsquared(load_weekday, eqn_weekday(t2m_weekday))
+R2_weekend = funcs.rsquared(load_weekend, eqn_weekend(t2m_weekend)) # R2 for weekend+holiday load and T2M.
+R2_weekday = funcs.rsquared(load_weekday, eqn_weekday(t2m_weekday)) # R2 for weekday load and T2M.
 
-###### Recreate the figure for just weekend and holiday days and then weekdays ######
+###### Recreate the figure for just weekend+holiday days and then weekdays ######
 # First, anomalous peak load against daily average T2M for weekdays
 fig = plt.figure(figsize = (10,5)) # Generate figure.
 ax = fig.add_subplot(1, 2, 1) # Add subplot.
