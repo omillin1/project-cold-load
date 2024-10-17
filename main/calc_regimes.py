@@ -12,7 +12,7 @@ import xarray as xr
 
 from argparse import ArgumentParser
 
-parser = ArgumentParser(description='Create N American Weather Regimes',
+parser = ArgumentParser(description='Calculate N American Winter Weather Regimes using method by Lee et al. (2019)',
                         epilog='Example: calc_regimes.py -y 1950 2023 -c 1979 2020')
 parser.add_argument('-y','--years',nargs=2,type=int,help='Years to download',default=[1950,2023])
 parser.add_argument('-c','--clim',nargs=2,type=int,help='Climo bounds',default=[1979,2020])
@@ -33,52 +33,56 @@ slp_data = funcs.format_daily_ERA5(var = 'slp', level = None, lat_bounds = [lat1
 ###### Anomalies ######
 # Set year array for data.
 years_arr = np.arange(args.years[0], args.years[1]+1, 1)
-# Find indices of the select years.
+
+# Find indices of the select climo years.
 year_ind1, year_ind2 = np.where(years_arr == args.clim[0])[0][0], np.where(years_arr == args.clim[1])[0][0]
+
 # Find climo for hgt.
 climo = np.nanmean(hgt_data[year_ind1:year_ind2+1], axis = 0)
 # Find climo for T2M.
 climo_t2m = np.nanmean(t2m_data[year_ind1:year_ind2+1], axis = 0)
-# Find main anomalies.
+
+# Find hgt and T2M anomalies.
 anom = hgt_data - climo
 anom_t2m = t2m_data - climo_t2m
 
 ###### Reshaping ######
-# Flatten hgt to get (days, lat, lon)
+# Reshape hgt to get (days, lat, lon)
 flat_anom = anom.reshape(anom.shape[0]*anom.shape[1], anom.shape[2], anom.shape[3])
-# Flatten T2M to get (days, lat, lon)
+# Reshape T2M to get (days, lat, lon)
 flat_anom_t2m = anom_t2m.reshape(anom_t2m.shape[0]*anom_t2m.shape[1], anom_t2m.shape[2], anom_t2m.shape[3])
-# Flatten SLP to get (days, lat, lon)
+# Reshape SLP to get (days, lat, lon)
 flat_slp = slp_data.reshape(slp_data.shape[0]*slp_data.shape[1], slp_data.shape[2], slp_data.shape[3])
-# Flatten time to get (days,)
+# Reshape time to get (days,)
 flat_time = time.reshape(time.shape[0]*time.shape[1])
 
 ###### Linearly Detrend GPH and T2M ######
 # Set month and year tracker for data.
 months_all = np.array([d.month for d in flat_time])
 days_all = np.array([d.day for d in flat_time])
-ltm_dates = time[0] # Calendar dates.
+ltm_dates = time[0] # Calendar dates for one year.
 
-# Set arrays for linearly detrended data to be stored.
+# Set arrays for linearly detrended GPH and T2M data to be stored.
 detrended_gph = np.zeros((flat_anom.shape))
 detrended_t2m = np.zeros((flat_anom_t2m.shape))
 
-# Go through each calendar day and detrend the day and place back into detrended array.
+# Go through each calendar day and detrend the calendar day and place back into detrended array.
 J, I = detrended_gph.shape[1], detrended_gph.shape[2] # Lat and lon sizes.
 for i in tqdm(range(ltm_dates.shape[0])):
     time_ind = np.where((months_all == ltm_dates[i].month)&(days_all == ltm_dates[i].day))[0] # Get the time indices where time array is a given calendar day.
     T = time_ind.shape[0] # Get size of the number of calendar days.
-    detrended_gph[time_ind, :, :] = (funcs.LinearDetrend(flat_anom[time_ind, :, :].reshape(T, J*I))[0]).reshape(T, J, I) # Detrend hgt by calendar day, reshape and store back in the empty array.
-    detrended_t2m[time_ind, :, :] = (funcs.LinearDetrend(flat_anom_t2m[time_ind, :, :].reshape(T, J*I))[0]).reshape(T, J, I) # Detrend T2M by calendar day, reshape and store back in the empty array.
+    detrended_gph[time_ind, :, :] = (funcs.LinearDetrend(flat_anom[time_ind, :, :].reshape(T, J*I))[0]).reshape(T, J, I) # Detrend hgt by calendar day, reshape and store back in the zeros array.
+    detrended_t2m[time_ind, :, :] = (funcs.LinearDetrend(flat_anom_t2m[time_ind, :, :].reshape(T, J*I))[0]).reshape(T, J, I) # Detrend T2M by calendar day, reshape and store back in the zeros array.
 
 ###### PCA and Clustering ######
-# Multiply by square-root cosine weights
+# Multiply hgt data by square-root cosine weights
 weights = np.sqrt(np.cos(np.radians(latitude)))
 z500_anom_sc = detrended_gph*weights[:,np.newaxis]
 
 # Flatten lat-lon grid so that data array is shaped (time, space)
 z500_anom_flat = np.reshape(z500_anom_sc, (z500_anom_sc.shape[0],z500_anom_sc.shape[1]*z500_anom_sc.shape[2]))
 
+# Just some code to check how many EOFs lead to 80% explained variance, in our case 12 EOFs.
 '''var_to_explain = 0.8
 pca = PCA().fit(z500_anom_flat)
 var_explained = pca.explained_variance_ratio_
@@ -107,10 +111,10 @@ model_clust = kmeans.predict(pc_ts)
 # This isn't sorted - the indices are in the order that kmeans does the assignment, and that can vary each time the clustering runs
 # Specify the regime ID by its occupation frequency, low-to-high (ArH to PT)
 # Calculate what percentage of days fall into each type
-ratios = []
-for i in range(ncluster):
-	ratio = 100*(len(np.where(model_clust==i)[0])/float(len(model_clust)))
-	ratios.append(ratio)
+ratios = [] # Empty list for ratios of each regime.
+for i in range(ncluster): # Loop through number of clusters.
+	ratio = 100*(len(np.where(model_clust==i)[0])/float(len(model_clust))) # This is a percentage of all days that are in that regime.
+	ratios.append(ratio) # Append the ratio.
 # Sort the ratios.
 ratios_sorted = sorted(ratios)
 # Keep original ratios and ratios sorted.
@@ -126,7 +130,7 @@ for i in range(ncluster):
 model_clust=new_clust
 
 ###### Save the regimes in a txt file here ######
-# Change the numbers of regimes into the string name. Define list to append to.
+# Change the numbers of regimes into the string name (done via inspection of the maps to confirm the names). Define list to append to.
 regime_list = []
 for i in range(len(model_clust)):
     if model_clust[i] == 0.0:
@@ -139,26 +143,27 @@ for i in range(len(model_clust)):
         regime_list.append('WCR')
     elif model_clust[i] == 4.0:
         regime_list.append('ArL')
-# Turn into an array
+
+# Turn regime indicators into an array.
 regime_array = np.array(regime_list)
 
 ## Save the timeseries using pandas
-weather_types = pd.Series(regime_array, index=flat_time)
-cluster_df = pd.Series.to_frame(weather_types)
-cluster_df.to_csv(f'/share/data1/Students/ollie/CAOs/Data/Energy/Regimes/detrended_regimes_{args.years[0]}_{args.years[1]}_NDJFM.txt', sep=' ', index=True)
+weather_types = pd.Series(regime_array, index=flat_time) # Make the regime array a pandas series.
+cluster_df = pd.Series.to_frame(weather_types) # Pandas series to dataframe.
+cluster_df.to_csv(f'/share/data1/Students/ollie/CAOs/Data/Energy/Regimes/detrended_regimes_{args.years[0]}_{args.years[1]}_NDJFM.txt', sep=' ', index=True) # Save as a txt file.
 
 
 ###### Get composite Z500 and T2M anomalies in each regime ######
 # Empty arrays to store the 5 composite patterns.
-regime_composite = np.zeros((5,detrended_gph.shape[1],detrended_gph.shape[2]))
-regime_composite_t2m = np.zeros((5,detrended_t2m.shape[1],detrended_t2m.shape[2]))
-regime_composite_slp = np.zeros((5,flat_slp.shape[1],flat_slp.shape[2]))
+regime_composite = np.zeros((5,detrended_gph.shape[1],detrended_gph.shape[2])) # hgt
+regime_composite_t2m = np.zeros((5,detrended_t2m.shape[1],detrended_t2m.shape[2])) # T2M
+regime_composite_slp = np.zeros((5,flat_slp.shape[1],flat_slp.shape[2])) # slp
 # Loop through each regime and make a composite of each day in that regime.
 for r in range(5):
-    subset = np.where(model_clust == r)[0]
-    regime_composite[r] = np.nanmean(detrended_gph[subset],axis=0)/10 # For dam
-    regime_composite_t2m[r] = np.nanmean(detrended_t2m[subset], axis=0)
-    regime_composite_slp[r] = np.nanmean(flat_slp[subset], axis=0)/100 # For hPa.
+    subset = np.where(model_clust == r)[0] # Find where the data is in a given regime.
+    regime_composite[r] = np.nanmean(detrended_gph[subset],axis=0)/10 # Composite all those days, convert to dam.
+    regime_composite_t2m[r] = np.nanmean(detrended_t2m[subset], axis=0) # Composite all those regime days for T2M.
+    regime_composite_slp[r] = np.nanmean(flat_slp[subset], axis=0)/100 # Composite all those regime days for slp, convert to hPa.
 
 
 ###### Save the composite maps/ratios for plotting in separate environment with geopandas ######

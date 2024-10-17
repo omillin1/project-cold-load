@@ -12,13 +12,14 @@ import matplotlib.pyplot as plt
 from scipy.stats import percentileofscore, skew, kurtosis
 from utils import funcs
 
-###### Set up regions to retrieve and years to use ######
-divs = ['KACY', 'WR', 'SPS', 'OKGE', 'CSWS', 'SECI', 'WFEC', 'EDE', 'NPPD', 'OPPD', 'KCPL', 'MPS']
-year1, year2 = 1999, 2022
+###### Set up balancing authorities to retrieve and years to use ######
+divs = ['KACY', 'WR', 'SPS', 'OKGE', 'CSWS', 'SECI', 'WFEC', 'EDE', 'NPPD', 'OPPD', 'KCPL', 'MPS'] # Our 13 balancing authorities (12 here but KCPL is merged with INDN in the functions).
+year1, year2 = 1999, 2022 # Years to choose.
 
 ###### Get dates for time period ######
 dates_arr = funcs.read_early_load(div = 'OKGE', year1 = year1, month_bnd = [3, 11])[0] # 1999-2010 dates.
 dates_arr2 = funcs.read_late_load(2011, year2, months=['01', '02', '03', '04', '10', '11', '12'], month_bnd = [3, 11], div = 'OKGE')[0] # 2011-2022 dates.
+
 # Join the dates.
 all_dates = np.concatenate((dates_arr, dates_arr2))
 
@@ -31,7 +32,7 @@ for i in tqdm(range(len(divs))): # Loop through divisions
     load_comb = np.concatenate((load_early, load_late)) # Join the loads for the two periods.
     data_region.append(load_comb) # Append the joined load to the empty list.
 
-# Now vstack, to get an array of shape (region, time).
+# Now stack, to get an array of shape (region, time).
 all_regions = np.stack(data_region)
 
 ###### Now for peak load ######
@@ -57,14 +58,13 @@ dates_select = date_load[np.where(years_all == 2012)[0]]
 # Now read number of customers by division.
 cust_region = [] # Empty list to store customer numbers.
 for i in tqdm(range(len(divs))): # Loop through divisions.
-    year_cust, data_cust = funcs.read_cust_data(div = divs[i], year1 = year1, year2 = year2, param = 'Customers') # Get the customer number data
-
+    year_cust, data_cust = funcs.read_cust_data(div = divs[i], year1 = year1, year2 = year2, param = 'Customers') # Get the customer number data.
     cust_region.append(data_cust) # Append customer number by year to the empty list.
 
-# Now vstack to get shape (regions, year).
+# Now stack to get shape (regions, year).
 all_cust = np.stack(cust_region)/1000 # For thousands of customers.
 
-# Sum for all customers by region. Will give shape (year,)
+# Sum customers across region. Will give shape (year,).
 sum_cust = np.nansum(all_cust, axis = 0)
 
 # Now go through and scale the peak load by number of customers.
@@ -95,7 +95,7 @@ for i in range(len(date_load)): # Loop through each date in the peak loads.
     ind = np.where(dates_regime == date_load[i])[0][0] # Find the index where the regime dates equals the chosen peak load date.
     regime_peak_load_list.append(regimes[ind]) # Append the regime to the regime list.
 # Make the list of regimes for peak load days into an array.
-regimes_peak_load = np.asarray(regime_peak_load_list)
+regimes_peak_load = np.array(regime_peak_load_list)
 
 ###### Split the anomalous peak load by weather regime ######
 akr_load = anom_peak_load[np.where(regimes_peak_load == 'AkR')[0]] # AkR.
@@ -178,7 +178,7 @@ for i in tqdm(range(n_samples)): # For each sample:
     rand_load_arl = np.random.choice(arl_load, size=arl_load.size, replace=True) # Pull random ArL loads from the ArL distribution with replacement.
     rand_load_pt = np.random.choice(pt_load, size=pt_load.size, replace=True) # Pull random PT loads from the PT distribution with replacement.
 
-    # Now for these sets of dates in each sample, loop through the percentiles and find the risk ratio.
+    # Now for these sets of loads in each sample, loop through the percentiles and find the risk ratio.
     for j in range(len(perc_arr)):
         # Threshold and probability for original distribution.
         threshold_boot = np.nanpercentile(anom_peak_load, q = perc_arr[j])
@@ -211,11 +211,11 @@ pt_bars = np.zeros((2, perc_arr.size))
 
 # Now loop through each percentile and calculate the upper and lower bounds of confidence.
 for i in range(perc_arr.size):
-    akr_bars[0, i], akr_bars[1, i] = np.nanpercentile(rr_boot_akr[:,i], q = perc1) - akr_rr[i], np.nanpercentile(rr_boot_akr[:,i], q = perc2) - akr_rr[i]
-    arh_bars[0, i], arh_bars[1, i] = np.nanpercentile(rr_boot_arh[:,i], q = perc1) - arh_rr[i], np.nanpercentile(rr_boot_arh[:,i], q = perc2) - arh_rr[i]
-    wcr_bars[0, i], wcr_bars[1, i] = np.nanpercentile(rr_boot_wcr[:,i], q = perc1) - wcr_rr[i], np.nanpercentile(rr_boot_wcr[:,i], q = perc2) - wcr_rr[i]
-    arl_bars[0, i], arl_bars[1, i] = np.nanpercentile(rr_boot_arl[:,i], q = perc1) - arl_rr[i], np.nanpercentile(rr_boot_arl[:,i], q = perc2) - arl_rr[i]
-    pt_bars[0, i], pt_bars[1, i] = np.nanpercentile(rr_boot_pt[:,i], q = perc1) - pt_rr[i], np.nanpercentile(rr_boot_pt[:,i], q = perc2) - pt_rr[i]
+    akr_bars[0, i], akr_bars[1, i] = np.nanpercentile(rr_boot_akr[:,i], q = perc1) - akr_rr[i], np.nanpercentile(rr_boot_akr[:,i], q = perc2) - akr_rr[i] # Absolute value of upper and lower error bars for AkR.
+    arh_bars[0, i], arh_bars[1, i] = np.nanpercentile(rr_boot_arh[:,i], q = perc1) - arh_rr[i], np.nanpercentile(rr_boot_arh[:,i], q = perc2) - arh_rr[i] # Absolute value of upper and lower error bars for ArH.
+    wcr_bars[0, i], wcr_bars[1, i] = np.nanpercentile(rr_boot_wcr[:,i], q = perc1) - wcr_rr[i], np.nanpercentile(rr_boot_wcr[:,i], q = perc2) - wcr_rr[i] # Absolute value of upper and lower error bars for WCR.
+    arl_bars[0, i], arl_bars[1, i] = np.nanpercentile(rr_boot_arl[:,i], q = perc1) - arl_rr[i], np.nanpercentile(rr_boot_arl[:,i], q = perc2) - arl_rr[i] # Absolute value of upper and lower error bars for ArL.
+    pt_bars[0, i], pt_bars[1, i] = np.nanpercentile(rr_boot_pt[:,i], q = perc1) - pt_rr[i], np.nanpercentile(rr_boot_pt[:,i], q = perc2) - pt_rr[i] # Absolute value of upper and lower error bars for PT.
 
 ###### Get the composite mean anomalies for each regime ######
 mean_akr = np.nanmean(akr_load)
